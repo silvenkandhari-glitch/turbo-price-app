@@ -60,7 +60,7 @@ button{padding:8px 12px;margin:5px;cursor:pointer;}
 const SUPABASE_URL = "https://byrslwvsgdrbnmkfena.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A";
 
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data=[];
 
