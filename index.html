@@ -8,7 +8,6 @@
 <style>
 body{font-family:Arial;background:#f5f5f5;padding:20px;}
 h2{background:#212529;color:white;padding:14px;text-align:center;}
-
 input,select{padding:8px;margin:5px;width:160px;}
 button{padding:8px 12px;margin:5px;cursor:pointer;}
 </style>
@@ -60,104 +59,112 @@ button{padding:8px 12px;margin:5px;cursor:pointer;}
 const SUPABASE_URL = "https://byrslwvsgdrbnmkfena.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A";
 
+// ✅ correct initialization
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let data=[];
+let data = [];
 
-// ✅ AUTO LOGIN
-checkSession();
-
-async function checkSession(){
-const { data: { session } } = await client.auth.getSession();
-
-if(session){
-showApp();
-fetchData();
-}
-}
+// ✅ auto session detect
+client.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    showApp();
+    fetchData();
+  }
+});
 
 // 🔐 LOGIN
 async function login(){
-let email=document.getElementById("email").value.trim();
-let password=document.getElementById("password").value.trim();
+  let email = document.getElementById("email").value.trim();
+  let password = document.getElementById("password").value.trim();
 
-const { data, error } = await client.auth.signInWithPassword({ email, password });
+  const { error } = await client.auth.signInWithPassword({
+    email,
+    password
+  });
 
-if(error){
-alert(error.message);
-return;
-}
-
-if(data.session){
-showApp();
-fetchData();
-}else{
-alert("Wrong email or password");
-}
+  if(error){
+    alert(error.message);
+  }
 }
 
 // 🆕 SIGNUP
 async function signup(){
-let email=document.getElementById("email").value.trim();
-let password=document.getElementById("password").value.trim();
+  let email = document.getElementById("email").value.trim();
+  let password = document.getElementById("password").value.trim();
 
-const { error } = await client.auth.signUp({ email, password });
+  const { error } = await client.auth.signUp({
+    email,
+    password
+  });
 
-if(error){
-alert(error.message);
-}else{
-alert("Signup success! Now login.");
-}
+  if(error){
+    alert(error.message);
+  } else {
+    alert("Signup successful! Now login.");
+  }
 }
 
 // 🚪 LOGOUT
 async function logout(){
-await client.auth.signOut();
-location.reload();
+  await client.auth.signOut();
+  location.reload();
 }
 
 // UI
 function showApp(){
-document.getElementById("loginBox").style.display="none";
-document.getElementById("adminControls").style.display="block";
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("adminControls").style.display="block";
 }
 
 // DATA
 async function fetchData(){
-let { data: result } = await client.from("parts").select("*");
-data=result || [];
-render();
+  let { data: result, error } = await client.from("parts").select("*");
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  data = result || [];
+  render();
 }
 
 async function addItem(){
-let item={
-part:document.getElementById("part").value,
-desc:document.getElementById("desc").value,
-make:document.getElementById("make").value.toUpperCase(),
-engine:document.getElementById("engine").value.toUpperCase(),
-type:document.getElementById("type").value,
-price:document.getElementById("price").value
-};
+  let item = {
+    part: document.getElementById("part").value,
+    desc: document.getElementById("desc").value,
+    make: document.getElementById("make").value.toUpperCase(),
+    engine: document.getElementById("engine").value.toUpperCase(),
+    type: document.getElementById("type").value,
+    price: document.getElementById("price").value
+  };
 
-await client.from("parts").insert([item]);
-fetchData();
+  const { error } = await client.from("parts").insert([item]);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  fetchData();
 }
 
+// render table
 function render(){
-let table=document.getElementById("table");
-table.innerHTML="";
+  let table = document.getElementById("table");
+  table.innerHTML = "";
 
-data.forEach(d=>{
-table.innerHTML+=`
-<tr>
-<td>${d.part}</td>
-<td>${d.desc}</td>
-<td>${d.make}</td>
-<td>${d.engine}</td>
-<td>${d.type}</td>
-<td>${d.price}</td>
-</tr>`;
-});
+  data.forEach(d=>{
+    table.innerHTML += `
+    <tr>
+      <td>${d.part}</td>
+      <td>${d.desc}</td>
+      <td>${d.make}</td>
+      <td>${d.engine}</td>
+      <td>${d.type}</td>
+      <td>${d.price}</td>
+    </tr>`;
+  });
 }
 
 </script>
