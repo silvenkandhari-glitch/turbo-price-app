@@ -11,31 +11,26 @@ h2{background:#212529;color:white;padding:14px;text-align:center;}
 
 input,select{padding:8px;margin:5px;width:160px;}
 button{padding:8px 12px;margin:5px;cursor:pointer;}
-
-table{margin-top:10px;border-collapse:collapse;width:100%;background:white;}
-th,td{border:1px solid #ddd;padding:8px;text-align:center;}
-th{background:#495057;color:white;}
-
-.make{background:#E85D04;color:white;font-weight:bold;}
-.engine{background:#ccc;font-weight:bold;}
-
-@media(max-width:600px){
-input,select,button{width:100%;}
-}
 </style>
 </head>
 
 <body>
 
+<!-- LOGIN -->
 <div id="loginBox">
-<input id="username" placeholder="Email">
+<input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
 <button onclick="login()">Login</button>
+<button onclick="signup()">Signup</button>
 </div>
 
 <h2>ZIEDEL PRICE LIST</h2>
 
-<div id="adminControls">
+<!-- ADMIN -->
+<div id="adminControls" style="display:none;">
+<button onclick="logout()">Logout</button>
+
+<br><br>
 
 <input id="search" placeholder="Search" onkeyup="render()">
 
@@ -56,63 +51,85 @@ input,select,button{width:100%;}
 <br>
 
 <button onclick="addItem()">Add</button>
-<button onclick="downloadCSV()">Download Excel</button>
-<button onclick="shareWhatsApp()">Share WhatsApp</button>
-<button onclick="openCustomerView()">Customer View</button>
-
 </div>
-
-<div id="dashboard"></div>
 
 <table id="table"></table>
 
 <script>
 
 const SUPABASE_URL = "https://byrslwvsgdrbnmkfena.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A";
+const SUPABASE_KEY = "sb_publishable_bNEzW0c55hp1a5z2Ar5jpg_549Ty0Eo"; // 🔴 PUT YOUR KEY HERE
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data=[];
 
-// LOGIN
+// ✅ AUTO LOGIN
+checkSession();
+
+async function checkSession(){
+const { data: { session } } = await supabase.auth.getSession();
+
+if(session){
+showApp();
+fetchData();
+}
+}
+
+// 🔐 LOGIN
 async function login(){
-let email=document.getElementById("username").value.trim();
+let email=document.getElementById("email").value.trim();
 let password=document.getElementById("password").value.trim();
 
-const { data, error } = await supabase.auth.signInWithPassword({
-  email: email,
-  password: password
-});
-
-console.log("RESULT:", data, error);
+const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
 if(error){
 alert(error.message);
 return;
 }
 
-if(data && data.session){
-alert("Login success");
-document.getElementById("loginBox").style.display="none";
-document.getElementById("adminControls").style.display="block";
+if(data.session){
+showApp();
 fetchData();
 }else{
-alert("Login failed");
+alert("Wrong email or password");
 }
 }
-document.getElementById("adminControls").style.display="none";
 
-// FETCH DATA
+// 🆕 SIGNUP
+async function signup(){
+let email=document.getElementById("email").value.trim();
+let password=document.getElementById("password").value.trim();
+
+const { error } = await supabase.auth.signUp({ email, password });
+
+if(error){
+alert(error.message);
+}else{
+alert("Signup success! Now login.");
+}
+}
+
+// 🚪 LOGOUT
+async function logout(){
+await supabase.auth.signOut();
+location.reload();
+}
+
+// UI
+function showApp(){
+document.getElementById("loginBox").style.display="none";
+document.getElementById("adminControls").style.display="block";
+}
+
+// DATA
 async function fetchData(){
 let { data: result } = await supabase.from("parts").select("*");
-data=result;
+data=result || [];
 render();
 }
 
-// ADD DATA
 async function addItem(){
-
 let item={
 part:document.getElementById("part").value,
 desc:document.getElementById("desc").value,
@@ -123,97 +140,24 @@ price:document.getElementById("price").value
 };
 
 await supabase.from("parts").insert([item]);
-
 fetchData();
 }
 
-// RENDER
 function render(){
-
 let table=document.getElementById("table");
 table.innerHTML="";
 
-let search=document.getElementById("search").value.toLowerCase();
-
-let filtered=data.filter(d =>
-d.part.toLowerCase().includes(search) ||
-d.make.toLowerCase().includes(search) ||
-d.engine.toLowerCase().includes(search)
-);
-
-document.getElementById("dashboard").innerHTML =
-"Total Parts: "+filtered.length;
-
-let grouped={};
-
-filtered.forEach(d=>{
-if(!grouped[d.make]) grouped[d.make]={};
-if(!grouped[d.make][d.engine]) grouped[d.make][d.engine]=[];
-grouped[d.make][d.engine].push(d);
-});
-
-for(let make in grouped){
-
-table.innerHTML+=`<tr><td colspan="4" class="make">${make}</td></tr>`;
-
-for(let engine in grouped[make]){
-
-table.innerHTML+=`<tr><td colspan="4" class="engine">${engine}</td></tr>`;
-
-table.innerHTML+=`
-<tr>
-<th>Part No</th>
-<th>Description</th>
-<th>Type</th>
-<th>Price</th>
-</tr>`;
-
-grouped[make][engine].forEach(d=>{
+data.forEach(d=>{
 table.innerHTML+=`
 <tr>
 <td>${d.part}</td>
 <td>${d.desc}</td>
+<td>${d.make}</td>
+<td>${d.engine}</td>
 <td>${d.type}</td>
 <td>${d.price}</td>
 </tr>`;
 });
-
-}
-}
-}
-
-// EXPORT
-function downloadCSV(){
-let csv="Part,Description,Make,Engine,Type,Price\n";
-data.forEach(d=>{
-csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.price}\n`;
-});
-let blob=new Blob([csv]);
-let a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="data.csv";
-a.click();
-}
-
-// WHATSAPP
-function shareWhatsApp(){
-let text="ZIEDEL PRICE LIST\n";
-data.forEach(d=>{
-text+=`${d.part} - ${d.make} - ${d.price}\n`;
-});
-window.open("https://wa.me/?text="+encodeURIComponent(text));
-}
-
-// CUSTOMER VIEW
-function openCustomerView(){
-window.open(window.location.href+"?view=customer");
-}
-
-const params=new URLSearchParams(window.location.search);
-if(params.get("view")==="customer"){
-document.getElementById("adminControls").style.display="none";
-document.getElementById("loginBox").style.display="none";
-fetchData();
 }
 
 </script>
