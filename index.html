@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ZIEDEL PRICE LIST</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<style>
+body{font-family:Arial;background:#f5f5f5;padding:20px;}
+h2{background:#212529;color:white;padding:14px;text-align:center;}
+
+input,select{padding:8px;margin:5px;width:160px;}
+button{padding:8px 12px;margin:5px;cursor:pointer;}
+
+table{margin-top:10px;border-collapse:collapse;width:100%;background:white;}
+th,td{border:1px solid #ddd;padding:8px;text-align:center;}
+th{background:#495057;color:white;}
+
+.make{background:#E85D04;color:white;font-weight:bold;}
+.engine{background:#ccc;font-weight:bold;}
+
+@media(max-width:600px){
+input,select,button{width:100%;}
+}
+</style>
+</head>
+
+<body>
+
+<div id="loginBox">
+<input id="username" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+</div>
+
+<h2>ZIEDEL PRICE LIST</h2>
+
+<div id="adminControls">
+
+<input id="search" placeholder="Search" onkeyup="render()">
+
+<br>
+
+<input id="part" placeholder="Part No">
+<input id="desc" placeholder="Description">
+<input id="make" placeholder="Car Make">
+<input id="engine" placeholder="Engine Model">
+
+<select id="type">
+<option>CHRA</option>
+<option>Turbocharger</option>
+</select>
+
+<input id="price" placeholder="Price">
+
+<br>
+
+<button onclick="addItem()">Add</button>
+<button onclick="downloadCSV()">Download Excel</button>
+<button onclick="shareWhatsApp()">Share WhatsApp</button>
+<button onclick="openCustomerView()">Customer View</button>
+
+</div>
+
+<div id="dashboard"></div>
+
+<table id="table"></table>
+
+<script>
+
+const SUPABASE_URL = "PASTE_YOUR_URL";
+const SUPABASE_KEY = "PASTE_YOUR_KEY";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let data=[];
+
+// LOGIN
+async function login(){
+let email=document.getElementById("username").value;
+let password=document.getElementById("password").value;
+
+const { error } = await supabase.auth.signInWithPassword({
+email:email,
+password:password
+});
+
+if(error){
+alert("Login failed");
+}else{
+document.getElementById("loginBox").style.display="none";
+document.getElementById("adminControls").style.display="block";
+fetchData();
+}
+}
+
+document.getElementById("adminControls").style.display="none";
+
+// FETCH DATA
+async function fetchData(){
+let { data: result } = await supabase.from("parts").select("*");
+data=result;
+render();
+}
+
+// ADD DATA
+async function addItem(){
+
+let item={
+part:document.getElementById("part").value,
+desc:document.getElementById("desc").value,
+make:document.getElementById("make").value.toUpperCase(),
+engine:document.getElementById("engine").value.toUpperCase(),
+type:document.getElementById("type").value,
+price:document.getElementById("price").value
+};
+
+await supabase.from("parts").insert([item]);
+
+fetchData();
+}
+
+// RENDER
+function render(){
+
+let table=document.getElementById("table");
+table.innerHTML="";
+
+let search=document.getElementById("search").value.toLowerCase();
+
+let filtered=data.filter(d =>
+d.part.toLowerCase().includes(search) ||
+d.make.toLowerCase().includes(search) ||
+d.engine.toLowerCase().includes(search)
+);
+
+document.getElementById("dashboard").innerHTML =
+"Total Parts: "+filtered.length;
+
+let grouped={};
+
+filtered.forEach(d=>{
+if(!grouped[d.make]) grouped[d.make]={};
+if(!grouped[d.make][d.engine]) grouped[d.make][d.engine]=[];
+grouped[d.make][d.engine].push(d);
+});
+
+for(let make in grouped){
+
+table.innerHTML+=`<tr><td colspan="4" class="make">${make}</td></tr>`;
+
+for(let engine in grouped[make]){
+
+table.innerHTML+=`<tr><td colspan="4" class="engine">${engine}</td></tr>`;
+
+table.innerHTML+=`
+<tr>
+<th>Part No</th>
+<th>Description</th>
+<th>Type</th>
+<th>Price</th>
+</tr>`;
+
+grouped[make][engine].forEach(d=>{
+table.innerHTML+=`
+<tr>
+<td>${d.part}</td>
+<td>${d.desc}</td>
+<td>${d.type}</td>
+<td>${d.price}</td>
+</tr>`;
+});
+
+}
+}
+}
+
+// EXPORT
+function downloadCSV(){
+let csv="Part,Description,Make,Engine,Type,Price\n";
+data.forEach(d=>{
+csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.price}\n`;
+});
+let blob=new Blob([csv]);
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="data.csv";
+a.click();
+}
+
+// WHATSAPP
+function shareWhatsApp(){
+let text="ZIEDEL PRICE LIST\n";
+data.forEach(d=>{
+text+=`${d.part} - ${d.make} - ${d.price}\n`;
+});
+window.open("https://wa.me/?text="+encodeURIComponent(text));
+}
+
+// CUSTOMER VIEW
+function openCustomerView(){
+window.open(window.location.href+"?view=customer");
+}
+
+const params=new URLSearchParams(window.location.search);
+if(params.get("view")==="customer"){
+document.getElementById("adminControls").style.display="none";
+document.getElementById("loginBox").style.display="none";
+fetchData();
+}
+
+</script>
+
+</body>
+</html>
