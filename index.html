@@ -4,6 +4,7 @@
 <title>ZIEDEL PRICE LIST</title>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
 <style>
 body{font-family:Arial;background:#f5f5f5;padding:20px;}
 h2{background:#212529;color:white;padding:14px;text-align:center;}
@@ -57,7 +58,7 @@ button{padding:8px 12px;margin:5px;cursor:pointer;}
 <script>
 
 const SUPABASE_URL = "https://byrslwvsgdrbnmkfena.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A"; // 🔴 PUT YOUR KEY HERE
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A";
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -67,7 +68,7 @@ let data=[];
 checkSession();
 
 async function checkSession(){
-const { data: { session } } = await supabase.auth.getSession();
+const { data: { session } } = await client.auth.getSession();
 
 if(session){
 showApp();
@@ -80,7 +81,7 @@ async function login(){
 let email=document.getElementById("email").value.trim();
 let password=document.getElementById("password").value.trim();
 
-const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+const { data, error } = await client.auth.signInWithPassword({ email, password });
 
 if(error){
 alert(error.message);
@@ -100,7 +101,7 @@ async function signup(){
 let email=document.getElementById("email").value.trim();
 let password=document.getElementById("password").value.trim();
 
-const { error } = await supabase.auth.signUp({ email, password });
+const { error } = await client.auth.signUp({ email, password });
 
 if(error){
 alert(error.message);
@@ -111,7 +112,7 @@ alert("Signup success! Now login.");
 
 // 🚪 LOGOUT
 async function logout(){
-await supabase.auth.signOut();
+await client.auth.signOut();
 location.reload();
 }
 
