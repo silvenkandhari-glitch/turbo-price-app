@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html>
 <head>
 <title>ZIEDEL PRICE LIST</title>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- ✅ FIXED CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 body{font-family:Arial;background:#f5f5f5;padding:20px;}
@@ -31,10 +32,6 @@ button{padding:8px 12px;margin:5px;cursor:pointer;}
 
 <br><br>
 
-<input id="search" placeholder="Search" onkeyup="render()">
-
-<br>
-
 <input id="part" placeholder="Part No">
 <input id="desc" placeholder="Description">
 <input id="make" placeholder="Car Make">
@@ -52,19 +49,20 @@ button{padding:8px 12px;margin:5px;cursor:pointer;}
 <button onclick="addItem()">Add</button>
 </div>
 
-<table id="table"></table>
+<table id="table" border="1" cellpadding="5"></table>
 
 <script>
 
+// ✅ YOUR PROJECT
 const SUPABASE_URL = "https://byrslwvsgdrbnmkfena.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A";
 
-// ✅ correct initialization
-const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ✅ CORRECT CLIENT
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data = [];
 
-// ✅ auto session detect
+// ✅ AUTO LOGIN LISTENER
 client.auth.onAuthStateChange((event, session) => {
   if (session) {
     showApp();
@@ -77,10 +75,7 @@ async function login(){
   let email = document.getElementById("email").value.trim();
   let password = document.getElementById("password").value.trim();
 
-  const { error } = await client.auth.signInWithPassword({
-    email,
-    password
-  });
+  const { error } = await client.auth.signInWithPassword({ email, password });
 
   if(error){
     alert(error.message);
@@ -92,10 +87,7 @@ async function signup(){
   let email = document.getElementById("email").value.trim();
   let password = document.getElementById("password").value.trim();
 
-  const { error } = await client.auth.signUp({
-    email,
-    password
-  });
+  const { error } = await client.auth.signUp({ email, password });
 
   if(error){
     alert(error.message);
@@ -116,7 +108,7 @@ function showApp(){
   document.getElementById("adminControls").style.display="block";
 }
 
-// DATA
+// 📦 FETCH DATA
 async function fetchData(){
   let { data: result, error } = await client.from("parts").select("*");
 
@@ -129,6 +121,7 @@ async function fetchData(){
   render();
 }
 
+// ➕ ADD ITEM
 async function addItem(){
   let item = {
     part: document.getElementById("part").value,
@@ -149,10 +142,19 @@ async function addItem(){
   fetchData();
 }
 
-// render table
+// 📊 RENDER
 function render(){
   let table = document.getElementById("table");
-  table.innerHTML = "";
+
+  table.innerHTML = `
+  <tr>
+    <th>Part</th>
+    <th>Description</th>
+    <th>Make</th>
+    <th>Engine</th>
+    <th>Type</th>
+    <th>Price</th>
+  </tr>`;
 
   data.forEach(d=>{
     table.innerHTML += `
