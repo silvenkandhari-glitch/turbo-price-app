@@ -59,7 +59,7 @@ button{padding:8px 12px;margin:5px;cursor:pointer;}
 const SUPABASE_URL = "https://byrslwvsgdrbnmkfena.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A"; // 🔴 PUT YOUR KEY HERE
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data=[];
 
@@ -123,7 +123,7 @@ document.getElementById("adminControls").style.display="block";
 
 // DATA
 async function fetchData(){
-let { data: result } = await supabase.from("parts").select("*");
+let { data: result } = await client.from("parts").select("*");
 data=result || [];
 render();
 }
@@ -138,7 +138,7 @@ type:document.getElementById("type").value,
 price:document.getElementById("price").value
 };
 
-await supabase.from("parts").insert([item]);
+await client.from("parts").insert([item]);
 fetchData();
 }
 
