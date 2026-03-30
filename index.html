@@ -2,45 +2,11 @@
 <html>
 <head>
   <title>Ziedel Price List</title>
-  <style>
-    body {
-      font-family: Arial;
-      padding: 20px;
-      background: #f5f5f5;
-    }
-
-    input, button {
-      margin: 5px;
-      padding: 8px;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 20px;
-      background: white;
-    }
-
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-    }
-
-    th {
-      background: #333;
-      color: white;
-    }
-
-    #adminControls {
-      display: none;
-    }
-  </style>
 </head>
 <body>
 
 <h2>Ziedel Price List</h2>
 
-<!-- LOGIN -->
 <div id="loginBox">
   <input id="email" placeholder="Email"><br>
   <input id="password" type="password" placeholder="Password"><br>
@@ -48,18 +14,16 @@
   <button onclick="signup()">Signup</button>
 </div>
 
-<!-- APP -->
-<div id="adminControls">
-  <button onclick="logout()">Logout</button>
+<div id="adminControls" style="display:none;">
+  <button onclick="logout()">Logout</button><br><br>
 
-  <h3>Add Item</h3>
   <input id="part" placeholder="Part">
   <input id="desc" placeholder="Description">
   <input id="make" placeholder="Make">
   <input id="engine" placeholder="Engine">
-  <input id="type" placeholder="Type (CHRA or OTHER)">
+  <input id="type" placeholder="Type">
   <input id="price" placeholder="Price">
-  <button onclick="addItem()">Add Item</button>
+  <button onclick="addItem()">Add</button>
 
   <table id="table"></table>
 </div>
@@ -85,7 +49,6 @@ import {
   orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 YOUR REAL CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -101,19 +64,17 @@ const db = getFirestore(app);
 
 let data = [];
 
-// AUTH STATE
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    showApp();
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("adminControls").style.display = "block";
     fetchData();
   }
 });
 
-// LOGIN
 window.login = async function () {
   let email = document.getElementById("email").value;
   let password = document.getElementById("password").value;
-
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch (e) {
@@ -121,11 +82,9 @@ window.login = async function () {
   }
 };
 
-// SIGNUP
 window.signup = async function () {
   let email = document.getElementById("email").value;
   let password = document.getElementById("password").value;
-
   try {
     await createUserWithEmailAndPassword(auth, email, password);
     alert("Signup successful!");
@@ -134,56 +93,41 @@ window.signup = async function () {
   }
 };
 
-// LOGOUT
 window.logout = async function () {
   await signOut(auth);
   location.reload();
 };
 
-// ADD ITEM
 window.addItem = async function () {
-
   let part = document.getElementById("part").value;
-  let desc = document.getElementById("desc").value;
-  let make = document.getElementById("make").value;
-  let engine = document.getElementById("engine").value;
   let type = document.getElementById("type").value;
   let price = document.getElementById("price").value;
 
   if (!part || !type || !price) {
-    alert("Please fill required fields (Part, Type, Price)");
+    alert("Fill required fields");
     return;
   }
 
-  try {
-    let snapshot = await getDocs(collection(db, "parts"));
-    let count = snapshot.size + 1;
+  let snapshot = await getDocs(collection(db, "parts"));
+  let count = snapshot.size + 1;
 
-    let prefix = type === "CHRA" ? "1505-250" : "1808-250";
-    let ziedel = `${prefix}-${String(count).padStart(4, '0')}`;
+  let prefix = type === "CHRA" ? "1505-250" : "1808-250";
+  let ziedel = `${prefix}-${String(count).padStart(4, '0')}`;
 
-    let item = {
-      ziedel,
-      part,
-      desc,
-      make: make.toUpperCase(),
-      engine: engine.toUpperCase(),
-      type,
-      price,
-      created: Date.now()
-    };
+  await addDoc(collection(db, "parts"), {
+    ziedel,
+    part,
+    desc: document.getElementById("desc").value,
+    make: document.getElementById("make").value,
+    engine: document.getElementById("engine").value,
+    type,
+    price,
+    created: Date.now()
+  });
 
-    await addDoc(collection(db, "parts"), item);
-
-    clearInputs();
-    fetchData();
-
-  } catch (e) {
-    alert(e.message);
-  }
+  fetchData();
 };
 
-// FETCH
 async function fetchData() {
   let q = query(collection(db, "parts"), orderBy("created", "desc"));
   let snapshot = await getDocs(q);
@@ -194,47 +138,31 @@ async function fetchData() {
   render();
 }
 
-// UI
-function showApp() {
-  document.getElementById("loginBox").style.display = "none";
-  document.getElementById("adminControls").style.display = "block";
-}
-
-function clearInputs() {
-  document.getElementById("part").value = "";
-  document.getElementById("desc").value = "";
-  document.getElementById("make").value = "";
-  document.getElementById("engine").value = "";
-  document.getElementById("type").value = "";
-  document.getElementById("price").value = "";
-}
-
-// RENDER
 function render() {
   let table = document.getElementById("table");
 
   table.innerHTML = `
-  <tr>
-    <th>ZIEDEL</th>
-    <th>Part</th>
-    <th>Description</th>
-    <th>Make</th>
-    <th>Engine</th>
-    <th>Type</th>
-    <th>Price</th>
-  </tr>`;
+    <tr>
+      <th>ZIEDEL</th>
+      <th>Part</th>
+      <th>Description</th>
+      <th>Make</th>
+      <th>Engine</th>
+      <th>Type</th>
+      <th>Price</th>
+    </tr>`;
 
   data.forEach(d => {
     table.innerHTML += `
-    <tr>
-      <td>${d.ziedel}</td>
-      <td>${d.part}</td>
-      <td>${d.desc}</td>
-      <td>${d.make}</td>
-      <td>${d.engine}</td>
-      <td>${d.type}</td>
-      <td>${d.price}</td>
-    </tr>`;
+      <tr>
+        <td>${d.ziedel}</td>
+        <td>${d.part}</td>
+        <td>${d.desc}</td>
+        <td>${d.make}</td>
+        <td>${d.engine}</td>
+        <td>${d.type}</td>
+        <td>${d.price}</td>
+      </tr>`;
   });
 }
 
