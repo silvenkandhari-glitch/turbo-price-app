@@ -128,6 +128,7 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <br>
 
 <button onclick="addItem()">Add / Update</button>
+<button onclick="clearAll()">Clear All</button>
 <button onclick="downloadCSV()">Download Excel</button>
 
 <input type="file" id="fileInput">
@@ -229,6 +230,14 @@ engine.value=d.engine;
 type.value=d.type;
 priceUSD.value=d.priceUSD;
 editId=id;
+};
+
+// CLEAR ALL
+window.clearAll=()=>{
+if(confirm("Delete all data?")){
+data=[];
+render();
+}
 };
 
 // DOWNLOAD CSV
