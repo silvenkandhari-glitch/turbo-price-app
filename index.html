@@ -213,10 +213,12 @@ await addDoc(collection(db,"parts"),item);
 fetchData();
 };
 
-// DELETE
+// DELETE (with confirmation)
 window.deleteItem=async(id)=>{
+if(confirm("Are you sure you want to delete this item?")){
 await deleteDoc(doc(db,"parts",id));
 fetchData();
+}
 };
 
 // EDIT
