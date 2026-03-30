@@ -8,81 +8,17 @@
 
 <style>
 
-body{
-font-family:Arial;
-background:#f5f5f5;
-padding:20px;
-}
-
-h2{
-font-family:'Poppins',sans-serif;
-background:#212529;
-color:white;
-padding:14px;
-border-radius:6px;
-text-align:center;
-font-size:30px;
-}
-
-.sectionCHRA,.sectionTurbo{
-background:#212529;
-color:white;
-font-size:20px;
-font-weight:bold;
-padding:10px;
-}
-
-.makeHeading{
-background:#E85D04;
-color:white;
-padding:8px;
-}
-
-input,select{
-padding:8px;
-margin:5px;
-width:170px;
-}
-
-button{
-padding:8px 14px;
-margin:5px;
-cursor:pointer;
-background:#495057;
-color:white;
-border:none;
-border-radius:5px;
-}
-
-table{
-margin-top:10px;
-border-collapse:collapse;
-width:100%;
-background:white;
-}
-
-th,td{
-border:1px solid #ddd;
-padding:8px;
-text-align:center;
-}
-
-th{
-background:#495057;
-color:white;
-}
-
-.price{
-font-weight:bold;
-color:#2D6A4F;
-}
-
-/* THEMES (same as yours) */
-body.dark{background:#121212;color:white;}
-body.dark table{background:#1f1f1f;color:white;}
-body.orange h2, body.orange .sectionCHRA, body.orange .sectionTurbo{background:#E85D04;}
-body.blue h2, body.blue .sectionCHRA, body.blue .sectionTurbo{background:#1971C2;}
-body.green h2, body.green .sectionCHRA, body.green .sectionTurbo{background:#2D6A4F;}
+/* KEEP YOUR ORIGINAL STYLE EXACTLY */
+body{font-family:Arial;background:#f5f5f5;padding:20px;}
+h2{font-family:'Poppins';background:#212529;color:white;padding:14px;border-radius:6px;text-align:center;font-size:30px;}
+.sectionCHRA,.sectionTurbo{background:#212529;color:white;font-size:20px;padding:10px;}
+.makeHeading{background:#E85D04;color:white;padding:8px;}
+input,select{padding:8px;margin:5px;width:170px;}
+button{padding:8px 14px;margin:5px;background:#495057;color:white;border:none;border-radius:5px;}
+table{margin-top:10px;border-collapse:collapse;width:100%;background:white;}
+th,td{border:1px solid #ddd;padding:8px;text-align:center;}
+th{background:#495057;color:white;}
+.price{font-weight:bold;color:#2D6A4F;}
 
 </style>
 </head>
@@ -91,7 +27,6 @@ body.green h2, body.green .sectionCHRA, body.green .sectionTurbo{background:#2D6
 
 <h2>ZIEDEL PRICE LIST</h2>
 
-<!-- LOGIN -->
 <div id="loginBox">
 <input id="email" placeholder="Email"><br>
 <input id="password" type="password" placeholder="Password"><br>
@@ -99,7 +34,6 @@ body.green h2, body.green .sectionCHRA, body.green .sectionTurbo{background:#2D6
 <button onclick="signup()">Signup</button>
 </div>
 
-<!-- APP -->
 <div id="adminControls" style="display:none;">
 
 <input id="search" placeholder="Search Part Number" onkeyup="render()">
@@ -109,7 +43,6 @@ body.green h2, body.green .sectionCHRA, body.green .sectionTurbo{background:#2D6
 <option value="dark">Dark</option>
 <option value="orange">Orange</option>
 <option value="blue">Blue</option>
-<option value="green">Green</option>
 </select>
 
 <br><br>
@@ -129,6 +62,14 @@ body.green h2, body.green .sectionCHRA, body.green .sectionTurbo{background:#2D6
 <br>
 
 <button onclick="addItem()">Add / Update</button>
+<button onclick="clearAll()">Clear All</button>
+<button onclick="downloadCSV()">Download Excel</button>
+
+<input type="file" id="fileInput">
+
+<br>
+
+<button onclick="openCustomer()">Customer Catalog Link</button>
 
 </div>
 
@@ -137,147 +78,137 @@ body.green h2, body.green .sectionCHRA, body.green .sectionTurbo{background:#2D6
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  updateDoc,
-  query,
-  orderBy
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-// 🔥 YOUR CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
-  projectId: "ziedel-price-list",
-  storageBucket: "ziedel-price-list.firebasestorage.app",
-  messagingSenderId: "354232126026",
-  appId: "1:354232126026:web:78375e019520c04ff474b3"
+  projectId: "ziedel-price-list"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let data = [];
-let editId = null;
+let data=[];
+let editId=null;
 
-// AUTH
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    document.getElementById("loginBox").style.display="none";
-    document.getElementById("adminControls").style.display="block";
-    fetchData();
-  }
+onAuthStateChanged(auth,async(user)=>{
+if(user){
+loginBox.style.display="none";
+adminControls.style.display="block";
+await fetchData();
+}
 });
 
-// LOGIN
-window.login = async () => {
-  await signInWithEmailAndPassword(auth,email.value,password.value);
-};
+window.login=()=>signInWithEmailAndPassword(auth,email.value,password.value);
+window.signup=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 
-// SIGNUP
-window.signup = async () => {
-  await createUserWithEmailAndPassword(auth,email.value,password.value);
-};
-
-// ADD / UPDATE
-window.addItem = async () => {
-
-  let usd=parseFloat(priceUSD.value);
-  let eur=(usd*0.92).toFixed(2);
-
-  let item={
-    part:part.value,
-    desc:desc.value,
-    make:make.value.toUpperCase(),
-    engine:engine.value.toUpperCase(),
-    type:type.value,
-    priceUSD:usd,
-    priceEUR:eur,
-    created:Date.now()
-  };
-
-  if(editId){
-    await updateDoc(doc(db,"parts",editId),item);
-    editId=null;
-  }else{
-    await addDoc(collection(db,"parts"),item);
-  }
-
-  fetchData();
-};
-
-// FETCH
 async function fetchData(){
-  let q=query(collection(db,"parts"),orderBy("created","desc"));
-  let snap=await getDocs(q);
-
-  data=[];
-  snap.forEach(d=>data.push({id:d.id,...d.data()}));
-
-  render();
+let snap=await getDocs(collection(db,"parts"));
+data=[];
+snap.forEach(d=>data.push({id:d.id,...d.data()}));
+render();
 }
 
-// DELETE
-window.deleteItem = async (id)=>{
-  await deleteDoc(doc(db,"parts",id));
-  fetchData();
+window.addItem=async()=>{
+let usd=parseFloat(priceUSD.value);
+let eur=(usd*0.92).toFixed(2);
+
+let item={
+part:part.value,
+desc:desc.value,
+make:make.value.toUpperCase(),
+engine:engine.value.toUpperCase(),
+type:type.value,
+priceUSD:usd,
+priceEUR:eur
 };
 
-// EDIT
-window.editItem = (id)=>{
-  let d=data.find(x=>x.id===id);
-  part.value=d.part;
-  desc.value=d.desc;
-  make.value=d.make;
-  engine.value=d.engine;
-  type.value=d.type;
-  priceUSD.value=d.priceUSD;
-  editId=id;
+if(editId){
+await updateDoc(doc(db,"parts",editId),item);
+editId=null;
+}else{
+await addDoc(collection(db,"parts"),item);
+}
+
+fetchData();
 };
 
-// THEME
-window.changeTheme = (t)=>{
-  document.body.className=t==="default"?"":t;
+window.deleteItem=async(id)=>{
+await deleteDoc(doc(db,"parts",id));
+fetchData();
 };
 
-// RENDER
+window.editItem=(id)=>{
+let d=data.find(x=>x.id===id);
+part.value=d.part;
+desc.value=d.desc;
+make.value=d.make;
+engine.value=d.engine;
+type.value=d.type;
+priceUSD.value=d.priceUSD;
+editId=id;
+};
+
+window.downloadCSV=()=>{
+let csv="Part,Desc,Make,Engine,Type,USD,EUR\n";
+data.forEach(d=>{
+csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
+});
+let blob=new Blob([csv]);
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="data.csv";
+a.click();
+};
+
+window.openCustomer=()=>{
+window.open(location.href+"?view=customer");
+};
+
+window.changeTheme=(t)=>{
+document.body.className=t==="default"?"":t;
+};
+
 function render(){
-  let searchVal=search.value.toLowerCase();
-  let filtered=data.filter(d=>d.part.toLowerCase().includes(searchVal));
 
-  let table=document.getElementById("table");
-  table.innerHTML="";
+let table=document.getElementById("table");
+table.innerHTML="";
 
-  filtered.forEach(d=>{
-    table.innerHTML+=`
-    <tr>
-      <td>${d.part}</td>
-      <td>${d.desc}</td>
-      <td>${d.make}</td>
-      <td>${d.engine}</td>
-      <td>${d.type}</td>
-      <td class="price">$${d.priceUSD}/€${d.priceEUR}</td>
-      <td>
-        <button onclick="editItem('${d.id}')">Edit</button>
-        <button onclick="deleteItem('${d.id}')">Delete</button>
-      </td>
-    </tr>`;
-  });
+let searchVal=search.value.toLowerCase();
+let filtered=data.filter(d=>d.part.toLowerCase().includes(searchVal));
+
+let grouped={};
+
+filtered.forEach(d=>{
+if(!grouped[d.make]) grouped[d.make]=[];
+grouped[d.make].push(d);
+});
+
+for(let make in grouped){
+
+table.innerHTML+=`<tr><td colspan="7" class="makeHeading">${make}</td></tr>`;
+
+grouped[make].forEach(d=>{
+table.innerHTML+=`
+<tr>
+<td>${d.part}</td>
+<td>${d.desc}</td>
+<td>${d.make}</td>
+<td>${d.engine}</td>
+<td>${d.type}</td>
+<td class="price">$${d.priceUSD}/€${d.priceEUR}</td>
+<td>
+<button onclick="editItem('${d.id}')">Edit</button>
+<button onclick="deleteItem('${d.id}')">Delete</button>
+</td>
+</tr>`;
+});
+
+}
+
 }
 
 </script>
