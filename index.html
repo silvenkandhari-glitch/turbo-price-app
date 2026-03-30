@@ -1,3 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ziedel Price List</title>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    input, button {
+      margin: 5px;
+      padding: 8px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      background: white;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+
+    th {
+      background: #333;
+      color: white;
+    }
+
+    #adminControls {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Ziedel Price List</h2>
+
+<!-- LOGIN -->
+<div id="loginBox">
+  <input id="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <button onclick="login()">Login</button>
+  <button onclick="signup()">Signup</button>
+</div>
+
+<!-- APP -->
+<div id="adminControls">
+  <button onclick="logout()">Logout</button>
+
+  <h3>Add Item</h3>
+  <input id="part" placeholder="Part">
+  <input id="desc" placeholder="Description">
+  <input id="make" placeholder="Make">
+  <input id="engine" placeholder="Engine">
+  <input id="type" placeholder="Type (CHRA or OTHER)">
+  <input id="price" placeholder="Price">
+  <button onclick="addItem()">Add Item</button>
+
+  <table id="table"></table>
+</div>
+
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -19,7 +85,7 @@ import {
   orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 YOUR CONFIG
+// 🔥 YOUR REAL CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -35,7 +101,7 @@ const db = getFirestore(app);
 
 let data = [];
 
-// 🔐 AUTH STATE
+// AUTH STATE
 onAuthStateChanged(auth, (user) => {
   if (user) {
     showApp();
@@ -74,52 +140,56 @@ window.logout = async function () {
   location.reload();
 };
 
-// ADD ITEM + ZIEDEL NUMBER
+// ADD ITEM
 window.addItem = async function () {
 
+  let part = document.getElementById("part").value;
+  let desc = document.getElementById("desc").value;
+  let make = document.getElementById("make").value;
+  let engine = document.getElementById("engine").value;
   let type = document.getElementById("type").value;
+  let price = document.getElementById("price").value;
 
-  // Get existing items
-  let snapshot = await getDocs(collection(db, "parts"));
+  if (!part || !type || !price) {
+    alert("Please fill required fields (Part, Type, Price)");
+    return;
+  }
 
-  let count = 1;
+  try {
+    let snapshot = await getDocs(collection(db, "parts"));
+    let count = snapshot.size + 1;
 
-  snapshot.forEach(doc => {
-    let d = doc.data();
-    if (d.type === type) count++;
-  });
+    let prefix = type === "CHRA" ? "1505-250" : "1808-250";
+    let ziedel = `${prefix}-${String(count).padStart(4, '0')}`;
 
-  let prefix = type === "CHRA" ? "1505-250" : "1808-250";
+    let item = {
+      ziedel,
+      part,
+      desc,
+      make: make.toUpperCase(),
+      engine: engine.toUpperCase(),
+      type,
+      price,
+      created: Date.now()
+    };
 
-  let ziedel = `${prefix}-${String(count).padStart(4, '0')}`;
+    await addDoc(collection(db, "parts"), item);
 
-  let item = {
-    ziedel: ziedel,
-    part: document.getElementById("part").value,
-    desc: document.getElementById("desc").value,
-    make: document.getElementById("make").value.toUpperCase(),
-    engine: document.getElementById("engine").value.toUpperCase(),
-    type: type,
-    price: document.getElementById("price").value,
-    created: Date.now()
-  };
+    clearInputs();
+    fetchData();
 
-  await addDoc(collection(db, "parts"), item);
-
-  fetchData();
+  } catch (e) {
+    alert(e.message);
+  }
 };
 
-// FETCH DATA
+// FETCH
 async function fetchData() {
-
   let q = query(collection(db, "parts"), orderBy("created", "desc"));
   let snapshot = await getDocs(q);
 
   data = [];
-
-  snapshot.forEach(doc => {
-    data.push(doc.data());
-  });
+  snapshot.forEach(doc => data.push(doc.data()));
 
   render();
 }
@@ -128,6 +198,15 @@ async function fetchData() {
 function showApp() {
   document.getElementById("loginBox").style.display = "none";
   document.getElementById("adminControls").style.display = "block";
+}
+
+function clearInputs() {
+  document.getElementById("part").value = "";
+  document.getElementById("desc").value = "";
+  document.getElementById("make").value = "";
+  document.getElementById("engine").value = "";
+  document.getElementById("type").value = "";
+  document.getElementById("price").value = "";
 }
 
 // RENDER
@@ -160,3 +239,6 @@ function render() {
 }
 
 </script>
+
+</body>
+</html>
