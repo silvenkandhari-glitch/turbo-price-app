@@ -128,7 +128,6 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <br>
 
 <button onclick="addItem()">Add / Update</button>
-<button onclick="clearAll()">Clear All</button>
 <button onclick="downloadCSV()">Download Excel</button>
 
 <input type="file" id="fileInput">
@@ -232,20 +231,12 @@ priceUSD.value=d.priceUSD;
 editId=id;
 };
 
-// CLEAR ALL
-window.clearAll=()=>{
-if(confirm("Delete all data?")){
-data=[];
-render();
-}
-};
-
 // DOWNLOAD CSV
 window.downloadCSV=()=>{
 let csv="Part No,Description,Car Make,Engine Model,Type,Price USD,Price EUR\n";
 
 data.forEach(d=>{
-csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
+csv+=${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n;
 });
 
 const blob=new Blob([csv],{type:"text/csv"});
@@ -323,7 +314,7 @@ if(list.length===0) return;
 
 let table=document.getElementById("table");
 
-table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="${style}">${title}</td></tr>`;
+table.innerHTML+=<tr><td colspan="${isCustomer?6:7}" class="${style}">${title}</td></tr>;
 
 let grouped={};
 
@@ -334,7 +325,7 @@ grouped[d.make].push(d);
 
 for(let make in grouped){
 
-table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="makeHeading">${make}</td></tr>`;
+table.innerHTML+=<tr><td colspan="${isCustomer?6:7}" class="makeHeading">${make}</td></tr>;
 
 table.innerHTML+=`
 <tr>
