@@ -1,153 +1,142 @@
-  <!DOCTYPE html>
-<html>
-<head>
-<title>ZIEDEL PRICE LIST</title>
+<script type="module">
 
-<!-- ✅ FIXED CDN -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-<style>
-body{font-family:Arial;background:#f5f5f5;padding:20px;}
-h2{background:#212529;color:white;padding:14px;text-align:center;}
-input,select{padding:8px;margin:5px;width:160px;}
-button{padding:8px 12px;margin:5px;cursor:pointer;}
-</style>
-</head>
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-<body>
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-<!-- LOGIN -->
-<div id="loginBox">
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
-<button onclick="login()">Login</button>
-<button onclick="signup()">Signup</button>
-</div>
+// 🔥 YOUR CONFIG
+const firebaseConfig = {
+  apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
+  authDomain: "ziedel-price-list.firebaseapp.com",
+  projectId: "ziedel-price-list",
+  storageBucket: "ziedel-price-list.firebasestorage.app",
+  messagingSenderId: "354232126026",
+  appId: "1:354232126026:web:78375e019520c04ff474b3"
+};
 
-<h2>ZIEDEL PRICE LIST</h2>
-
-<!-- ADMIN -->
-<div id="adminControls" style="display:none;">
-<button onclick="logout()">Logout</button>
-
-<br><br>
-
-<input id="part" placeholder="Part No">
-<input id="desc" placeholder="Description">
-<input id="make" placeholder="Car Make">
-<input id="engine" placeholder="Engine Model">
-
-<select id="type">
-<option>CHRA</option>
-<option>Turbocharger</option>
-</select>
-
-<input id="price" placeholder="Price">
-
-<br>
-
-<button onclick="addItem()">Add</button>
-</div>
-
-<table id="table" border="1" cellpadding="5"></table>
-
-<script>
-
-// ✅ YOUR PROJECT
-const SUPABASE_URL = "https://byrslwvsgdrbnmkfena.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5cnNsd3ZzZmdkcmJubWtmZW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTQ2MTcsImV4cCI6MjA5MDI3MDYxN30.tBnFmxg8CzNT2OcmlUsVr8DFyHXs0GZJSp6PXf8Ec2A";
-
-// ✅ CORRECT CLIENT
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 let data = [];
 
-// ✅ AUTO LOGIN LISTENER
-client.auth.onAuthStateChange((event, session) => {
-  if (session) {
+// 🔐 AUTH STATE
+onAuthStateChanged(auth, (user) => {
+  if (user) {
     showApp();
     fetchData();
   }
 });
 
-// 🔐 LOGIN
-async function login(){
-  let email = document.getElementById("email").value.trim();
-  let password = document.getElementById("password").value.trim();
+// LOGIN
+window.login = async function () {
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
 
-  const { error } = await client.auth.signInWithPassword({ email, password });
-
-  if(error){
-    alert(error.message);
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (e) {
+    alert(e.message);
   }
-}
+};
 
-// 🆕 SIGNUP
-async function signup(){
-  let email = document.getElementById("email").value.trim();
-  let password = document.getElementById("password").value.trim();
+// SIGNUP
+window.signup = async function () {
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
 
-  const { error } = await client.auth.signUp({ email, password });
-
-  if(error){
-    alert(error.message);
-  } else {
-    alert("Signup successful! Now login.");
+  try {
+    await createUserWithEmailAndPassword(auth, email, password);
+    alert("Signup successful!");
+  } catch (e) {
+    alert(e.message);
   }
-}
+};
 
-// 🚪 LOGOUT
-async function logout(){
-  await client.auth.signOut();
+// LOGOUT
+window.logout = async function () {
+  await signOut(auth);
   location.reload();
-}
+};
 
-// UI
-function showApp(){
-  document.getElementById("loginBox").style.display="none";
-  document.getElementById("adminControls").style.display="block";
-}
+// ADD ITEM + ZIEDEL NUMBER
+window.addItem = async function () {
 
-// 📦 FETCH DATA
-async function fetchData(){
-  let { data: result, error } = await client.from("parts").select("*");
+  let type = document.getElementById("type").value;
 
-  if(error){
-    alert(error.message);
-    return;
-  }
+  // Get existing items
+  let snapshot = await getDocs(collection(db, "parts"));
 
-  data = result || [];
-  render();
-}
+  let count = 1;
 
-// ➕ ADD ITEM
-async function addItem(){
+  snapshot.forEach(doc => {
+    let d = doc.data();
+    if (d.type === type) count++;
+  });
+
+  let prefix = type === "CHRA" ? "1505-250" : "1808-250";
+
+  let ziedel = `${prefix}-${String(count).padStart(4, '0')}`;
+
   let item = {
+    ziedel: ziedel,
     part: document.getElementById("part").value,
     desc: document.getElementById("desc").value,
     make: document.getElementById("make").value.toUpperCase(),
     engine: document.getElementById("engine").value.toUpperCase(),
-    type: document.getElementById("type").value,
-    price: document.getElementById("price").value
+    type: type,
+    price: document.getElementById("price").value,
+    created: Date.now()
   };
 
-  const { error } = await client.from("parts").insert([item]);
-
-  if(error){
-    alert(error.message);
-    return;
-  }
+  await addDoc(collection(db, "parts"), item);
 
   fetchData();
+};
+
+// FETCH DATA
+async function fetchData() {
+
+  let q = query(collection(db, "parts"), orderBy("created", "desc"));
+  let snapshot = await getDocs(q);
+
+  data = [];
+
+  snapshot.forEach(doc => {
+    data.push(doc.data());
+  });
+
+  render();
 }
 
-// 📊 RENDER
-function render(){
+// UI
+function showApp() {
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("adminControls").style.display = "block";
+}
+
+// RENDER
+function render() {
   let table = document.getElementById("table");
 
   table.innerHTML = `
   <tr>
+    <th>ZIEDEL</th>
     <th>Part</th>
     <th>Description</th>
     <th>Make</th>
@@ -156,9 +145,10 @@ function render(){
     <th>Price</th>
   </tr>`;
 
-  data.forEach(d=>{
+  data.forEach(d => {
     table.innerHTML += `
     <tr>
+      <td>${d.ziedel}</td>
       <td>${d.part}</td>
       <td>${d.desc}</td>
       <td>${d.make}</td>
@@ -170,6 +160,3 @@ function render(){
 }
 
 </script>
-
-</body>
-</html>
