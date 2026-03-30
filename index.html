@@ -1,32 +1,138 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ziedel Price List</title>
+
+<title>ZIEDEL PRICE LIST</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+
+body{
+font-family:Arial;
+background:#f5f5f5;
+padding:20px;
+}
+
+h2{
+font-family:'Poppins',sans-serif;
+background:#212529;
+color:white;
+padding:14px;
+border-radius:6px;
+text-align:center;
+font-size:30px;
+}
+
+.sectionCHRA,.sectionTurbo{
+background:#212529;
+color:white;
+font-size:20px;
+font-weight:bold;
+padding:10px;
+}
+
+.makeHeading{
+background:#E85D04;
+color:white;
+padding:8px;
+}
+
+input,select{
+padding:8px;
+margin:5px;
+width:170px;
+}
+
+button{
+padding:8px 14px;
+margin:5px;
+cursor:pointer;
+background:#495057;
+color:white;
+border:none;
+border-radius:5px;
+}
+
+table{
+margin-top:10px;
+border-collapse:collapse;
+width:100%;
+background:white;
+}
+
+th,td{
+border:1px solid #ddd;
+padding:8px;
+text-align:center;
+}
+
+th{
+background:#495057;
+color:white;
+}
+
+.price{
+font-weight:bold;
+color:#2D6A4F;
+}
+
+/* THEMES (same as yours) */
+body.dark{background:#121212;color:white;}
+body.dark table{background:#1f1f1f;color:white;}
+body.orange h2, body.orange .sectionCHRA, body.orange .sectionTurbo{background:#E85D04;}
+body.blue h2, body.blue .sectionCHRA, body.blue .sectionTurbo{background:#1971C2;}
+body.green h2, body.green .sectionCHRA, body.green .sectionTurbo{background:#2D6A4F;}
+
+</style>
 </head>
+
 <body>
 
-<h2>Ziedel Price List</h2>
+<h2>ZIEDEL PRICE LIST</h2>
 
+<!-- LOGIN -->
 <div id="loginBox">
-  <input id="email" placeholder="Email"><br>
-  <input id="password" type="password" placeholder="Password"><br>
-  <button onclick="login()">Login</button>
-  <button onclick="signup()">Signup</button>
+<input id="email" placeholder="Email"><br>
+<input id="password" type="password" placeholder="Password"><br>
+<button onclick="login()">Login</button>
+<button onclick="signup()">Signup</button>
 </div>
 
+<!-- APP -->
 <div id="adminControls" style="display:none;">
-  <button onclick="logout()">Logout</button><br><br>
 
-  <input id="part" placeholder="Part">
-  <input id="desc" placeholder="Description">
-  <input id="make" placeholder="Make">
-  <input id="engine" placeholder="Engine">
-  <input id="type" placeholder="Type">
-  <input id="price" placeholder="Price">
-  <button onclick="addItem()">Add</button>
+<input id="search" placeholder="Search Part Number" onkeyup="render()">
 
-  <table id="table"></table>
+<select onchange="changeTheme(this.value)">
+<option value="default">Theme</option>
+<option value="dark">Dark</option>
+<option value="orange">Orange</option>
+<option value="blue">Blue</option>
+<option value="green">Green</option>
+</select>
+
+<br><br>
+
+<input id="part" placeholder="Part No">
+<input id="desc" placeholder="Description">
+<input id="make" placeholder="Car Make">
+<input id="engine" placeholder="Engine Model">
+
+<select id="type">
+<option>CHRA</option>
+<option>Turbocharger</option>
+</select>
+
+<input id="priceUSD" placeholder="Price ($)">
+
+<br>
+
+<button onclick="addItem()">Add / Update</button>
+
 </div>
+
+<table id="table"></table>
 
 <script type="module">
 
@@ -45,10 +151,14 @@ import {
   collection,
   addDoc,
   getDocs,
+  deleteDoc,
+  doc,
+  updateDoc,
   query,
   orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// 🔥 YOUR CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -63,106 +173,110 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let data = [];
+let editId = null;
 
+// AUTH
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("adminControls").style.display = "block";
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("adminControls").style.display="block";
     fetchData();
   }
 });
 
-window.login = async function () {
-  let email = document.getElementById("email").value;
-  let password = document.getElementById("password").value;
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (e) {
-    alert(e.message);
-  }
+// LOGIN
+window.login = async () => {
+  await signInWithEmailAndPassword(auth,email.value,password.value);
 };
 
-window.signup = async function () {
-  let email = document.getElementById("email").value;
-  let password = document.getElementById("password").value;
-  try {
-    await createUserWithEmailAndPassword(auth, email, password);
-    alert("Signup successful!");
-  } catch (e) {
-    alert(e.message);
-  }
+// SIGNUP
+window.signup = async () => {
+  await createUserWithEmailAndPassword(auth,email.value,password.value);
 };
 
-window.logout = async function () {
-  await signOut(auth);
-  location.reload();
-};
+// ADD / UPDATE
+window.addItem = async () => {
 
-window.addItem = async function () {
-  let part = document.getElementById("part").value;
-  let type = document.getElementById("type").value;
-  let price = document.getElementById("price").value;
+  let usd=parseFloat(priceUSD.value);
+  let eur=(usd*0.92).toFixed(2);
 
-  if (!part || !type || !price) {
-    alert("Fill required fields");
-    return;
+  let item={
+    part:part.value,
+    desc:desc.value,
+    make:make.value.toUpperCase(),
+    engine:engine.value.toUpperCase(),
+    type:type.value,
+    priceUSD:usd,
+    priceEUR:eur,
+    created:Date.now()
+  };
+
+  if(editId){
+    await updateDoc(doc(db,"parts",editId),item);
+    editId=null;
+  }else{
+    await addDoc(collection(db,"parts"),item);
   }
-
-  let snapshot = await getDocs(collection(db, "parts"));
-  let count = snapshot.size + 1;
-
-  let prefix = type === "CHRA" ? "1505-250" : "1808-250";
-  let ziedel = `${prefix}-${String(count).padStart(4, '0')}`;
-
-  await addDoc(collection(db, "parts"), {
-    ziedel,
-    part,
-    desc: document.getElementById("desc").value,
-    make: document.getElementById("make").value,
-    engine: document.getElementById("engine").value,
-    type,
-    price,
-    created: Date.now()
-  });
 
   fetchData();
 };
 
-async function fetchData() {
-  let q = query(collection(db, "parts"), orderBy("created", "desc"));
-  let snapshot = await getDocs(q);
+// FETCH
+async function fetchData(){
+  let q=query(collection(db,"parts"),orderBy("created","desc"));
+  let snap=await getDocs(q);
 
-  data = [];
-  snapshot.forEach(doc => data.push(doc.data()));
+  data=[];
+  snap.forEach(d=>data.push({id:d.id,...d.data()}));
 
   render();
 }
 
-function render() {
-  let table = document.getElementById("table");
+// DELETE
+window.deleteItem = async (id)=>{
+  await deleteDoc(doc(db,"parts",id));
+  fetchData();
+};
 
-  table.innerHTML = `
+// EDIT
+window.editItem = (id)=>{
+  let d=data.find(x=>x.id===id);
+  part.value=d.part;
+  desc.value=d.desc;
+  make.value=d.make;
+  engine.value=d.engine;
+  type.value=d.type;
+  priceUSD.value=d.priceUSD;
+  editId=id;
+};
+
+// THEME
+window.changeTheme = (t)=>{
+  document.body.className=t==="default"?"":t;
+};
+
+// RENDER
+function render(){
+  let searchVal=search.value.toLowerCase();
+  let filtered=data.filter(d=>d.part.toLowerCase().includes(searchVal));
+
+  let table=document.getElementById("table");
+  table.innerHTML="";
+
+  filtered.forEach(d=>{
+    table.innerHTML+=`
     <tr>
-      <th>ZIEDEL</th>
-      <th>Part</th>
-      <th>Description</th>
-      <th>Make</th>
-      <th>Engine</th>
-      <th>Type</th>
-      <th>Price</th>
+      <td>${d.part}</td>
+      <td>${d.desc}</td>
+      <td>${d.make}</td>
+      <td>${d.engine}</td>
+      <td>${d.type}</td>
+      <td class="price">$${d.priceUSD}/€${d.priceEUR}</td>
+      <td>
+        <button onclick="editItem('${d.id}')">Edit</button>
+        <button onclick="deleteItem('${d.id}')">Delete</button>
+      </td>
     </tr>`;
-
-  data.forEach(d => {
-    table.innerHTML += `
-      <tr>
-        <td>${d.ziedel}</td>
-        <td>${d.part}</td>
-        <td>${d.desc}</td>
-        <td>${d.make}</td>
-        <td>${d.engine}</td>
-        <td>${d.type}</td>
-        <td>${d.price}</td>
-      </tr>`;
   });
 }
 
