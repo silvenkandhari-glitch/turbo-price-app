@@ -17,12 +17,16 @@ const db = getFirestore(app);
 let data=[];
 let editId=null;
 
+// SAFE ELEMENTS
+const loginBox = document.getElementById("loginBox");
+const adminControls = document.getElementById("adminControls");
+
 // CUSTOMER MODE
 const urlParams = new URLSearchParams(window.location.search);
 const isCustomer = urlParams.get("view") === "customer";
 
 if(isCustomer){
-document.getElementById("adminControls").style.display="none";
+adminControls.style.display="none";
 }
 
 // AUTH
@@ -30,7 +34,7 @@ onAuthStateChanged(auth,(user)=>{
 if(user){
 loginBox.style.display="none";
 adminControls.style.display="block";
-listenData(); // REAL-TIME LISTENER
+listenData(); // 🔥 REAL TIME
 }
 });
 
@@ -38,7 +42,7 @@ listenData(); // REAL-TIME LISTENER
 window.login=()=>signInWithEmailAndPassword(auth,email.value,password.value);
 window.signup=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 
-// 🔥 REAL-TIME DATA (NO REFRESH NEEDED)
+// 🔥 REAL-TIME DATA (NO LAG)
 function listenData(){
 onSnapshot(collection(db,"parts"),(snapshot)=>{
 data=[];
@@ -49,8 +53,6 @@ render();
 
 // ADD
 window.addItem=async()=>{
-if(!part.value) return alert("Enter Part Number");
-
 let usd=parseFloat(priceUSD.value || 0);
 
 await addDoc(collection(db,"parts"),{
@@ -68,7 +70,7 @@ clearForm();
 
 // UPDATE
 window.updateItem=async()=>{
-if(!editId) return;
+if(!editId) return alert("Select item to update");
 
 let usd=parseFloat(priceUSD.value || 0);
 
@@ -88,7 +90,7 @@ clearForm();
 
 // DELETE
 window.deleteItem=async(id)=>{
-if(confirm("Delete this item?")){
+if(confirm("Are you sure you want to delete this item?")){
 await deleteDoc(doc(db,"parts",id));
 }
 };
@@ -96,14 +98,12 @@ await deleteDoc(doc(db,"parts",id));
 // EDIT
 window.editItem=(id)=>{
 let d=data.find(x=>x.id===id);
-
 part.value=d.part;
 desc.value=d.desc;
 make.value=d.make;
 engine.value=d.engine;
 type.value=d.type;
 priceUSD.value=d.priceUSD;
-
 editId=id;
 };
 
@@ -132,6 +132,37 @@ a.download="ziedel_price_list.csv";
 a.click();
 };
 
+// UPLOAD CSV (UNCHANGED BUT NO EXTRA FETCH)
+document.getElementById("fileInput").addEventListener("change",function(e){
+const file=e.target.files[0];
+const reader=new FileReader();
+
+reader.onload=function(event){
+const lines=event.target.result.split("\n");
+
+lines.slice(1).forEach(async row=>{
+let cols=row.split(",");
+if(cols.length>=6){
+
+let usd=parseFloat(cols[5]);
+
+await addDoc(collection(db,"parts"),{
+part:cols[0],
+desc:cols[1],
+make:cols[2],
+engine:cols[3],
+type:cols[4],
+priceUSD:usd,
+priceEUR:(usd*0.92).toFixed(2)
+});
+
+}
+});
+};
+
+reader.readAsText(file);
+});
+
 // CUSTOMER LINK
 window.openCustomer=()=>{
 const link=window.location.origin+window.location.pathname+"?view=customer";
@@ -143,13 +174,13 @@ window.changeTheme=(t)=>{
 document.body.className=t==="default"?"":t;
 };
 
-// RENDER
+// RENDER (SMALL FIX)
 function render(){
 
 let table=document.getElementById("table");
 table.innerHTML="";
 
-let searchVal=search.value.toLowerCase();
+let searchVal = document.getElementById("search") ? document.getElementById("search").value.toLowerCase() : "";
 
 let filtered=data.filter(d=>d.part.toLowerCase().includes(searchVal));
 
