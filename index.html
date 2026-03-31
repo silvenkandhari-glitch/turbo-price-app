@@ -8,7 +8,11 @@
 
 <style>
 
-body{font-family:Arial;background:#f5f5f5;padding:20px;}
+body{
+font-family:Arial;
+background:#f5f5f5;
+padding:20px;
+}
 
 h2{
 font-family:'Poppins';
@@ -17,6 +21,20 @@ color:white;
 padding:14px;
 border-radius:6px;
 text-align:center;
+font-size:30px;
+}
+
+.sectionCHRA,.sectionTurbo{
+background:#212529;
+color:white;
+font-size:20px;
+padding:10px;
+}
+
+.makeHeading{
+background:#E85D04;
+color:white;
+padding:8px;
 }
 
 input,select{
@@ -53,7 +71,17 @@ background:#495057;
 color:white;
 }
 
-.price{color:green;font-weight:bold;}
+.price{
+font-weight:bold;
+color:#2D6A4F;
+}
+
+/* THEMES */
+body.dark{background:#121212;color:white;}
+body.dark table{background:#1f1f1f;color:white;}
+body.orange h2,body.orange .sectionCHRA,body.orange .sectionTurbo{background:#E85D04;}
+body.blue h2,body.blue .sectionCHRA,body.blue .sectionTurbo{background:#1971C2;}
+body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4F;}
 
 </style>
 </head>
@@ -62,7 +90,6 @@ color:white;
 
 <h2>ZIEDEL PRICE LIST</h2>
 
-<!-- LOGIN -->
 <div id="loginBox">
 <input id="email" placeholder="Email"><br>
 <input id="password" type="password" placeholder="Password"><br>
@@ -70,195 +97,271 @@ color:white;
 <button onclick="signup()">Signup</button>
 </div>
 
-<!-- ADMIN -->
-<div id="admin" style="display:none;">
+<div id="adminControls" style="display:none;">
 
-<input id="search" placeholder="Search Part">
+<input id="search" placeholder="Search Part Number" onkeyup="render()">
+
+<select onchange="changeTheme(this.value)">
+<option value="default">Theme</option>
+<option value="dark">Dark</option>
+<option value="orange">Orange</option>
+<option value="blue">Blue</option>
+<option value="green">Green</option>
+</select>
 
 <br><br>
 
 <input id="part" placeholder="Part No">
 <input id="desc" placeholder="Description">
-<input id="make" placeholder="Make">
-<input id="engine" placeholder="Engine">
+<input id="make" placeholder="Car Make">
+<input id="engine" placeholder="Engine Model">
 
 <select id="type">
 <option>CHRA</option>
 <option>Turbocharger</option>
 </select>
 
-<input id="price" placeholder="USD Price">
+<input id="priceUSD" placeholder="Price ($)">
 
 <br>
 
-<button onclick="addItem()">Add</button>
-<button onclick="updateItem()">Update</button>
+<button id="addBtn" onclick="addItem()">Add / Update</button>
+<button onclick="downloadCSV()">Download Excel</button>
+
+<input type="file" id="fileInput">
+
+<br>
+
+<button onclick="openCustomer()">Customer Catalog Link</button>
 
 </div>
 
-<table id="table">
-<tr>
-<th>Part</th>
-<th>Description</th>
-<th>Make</th>
-<th>Engine</th>
-<th>Type</th>
-<th>Price</th>
-<th>Action</th>
-</tr>
-</table>
+<table id="table"></table>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// FIREBASE
-const app = initializeApp({
-apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
-authDomain: "ziedel-price-list.firebaseapp.com",
-projectId: "ziedel-price-list"
-});
+const firebaseConfig = {
+  apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
+  authDomain: "ziedel-price-list.firebaseapp.com",
+  projectId: "ziedel-price-list"
+};
 
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ELEMENTS
-const loginBox = document.getElementById("loginBox");
-const admin = document.getElementById("admin");
-const table = document.getElementById("table");
+let data=[];
+let editId=null;
 
-const email = document.getElementById("email");
-const password = document.getElementById("password");
+const urlParams = new URLSearchParams(window.location.search);
+const isCustomer = urlParams.get("view") === "customer";
 
-const part = document.getElementById("part");
-const desc = document.getElementById("desc");
-const make = document.getElementById("make");
-const engine = document.getElementById("engine");
-const type = document.getElementById("type");
-const price = document.getElementById("price");
-const search = document.getElementById("search");
+if(isCustomer){
+document.getElementById("adminControls").style.display="none";
+}
 
-let editId = null;
-let allData = [];
-
-// AUTH
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth,async(user)=>{
 if(user){
-loginBox.style.display = "none";
-admin.style.display = "block";
-listen();
+loginBox.style.display="none";
+adminControls.style.display="block";
+await fetchData();
 }
 });
 
-// LOGIN
-window.login = () => signInWithEmailAndPassword(auth, email.value, password.value);
-window.signup = () => createUserWithEmailAndPassword(auth, email.value, password.value);
+window.login=()=>signInWithEmailAndPassword(auth,email.value,password.value);
+window.signup=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 
-// REAL TIME
-function listen(){
-onSnapshot(collection(db,"parts"), snap=>{
-allData = [];
-snap.forEach(d => allData.push({id:d.id,...d.data()}));
+async function fetchData(){
+let snap=await getDocs(collection(db,"parts"));
+data=[];
+snap.forEach(d=>data.push({id:d.id,...d.data()}));
 render();
-});
 }
 
-// ADD
-window.addItem = async ()=>{
-await addDoc(collection(db,"parts"),{
+window.addItem=async()=>{
+
+let btn=document.getElementById("addBtn");
+
+btn.style.background="#2D6A4F";
+btn.innerText="Adding...";
+
+let usd=parseFloat(priceUSD.value);
+let eur=(usd*0.92).toFixed(2);
+
+let item={
 part:part.value,
 desc:desc.value,
-make:make.value,
-engine:engine.value,
+make:make.value.toUpperCase(),
+engine:engine.value.toUpperCase(),
 type:type.value,
-price:price.value
-});
-clear();
+priceUSD:usd,
+priceEUR:eur
 };
 
-// UPDATE
-window.updateItem = async ()=>{
-if(!editId) return alert("Select item");
+if(editId){
+await updateDoc(doc(db,"parts",editId),item);
+editId=null;
+}else{
+await addDoc(collection(db,"parts"),item);
+}
 
-await updateDoc(doc(db,"parts",editId),{
-part:part.value,
-desc:desc.value,
-make:make.value,
-engine:engine.value,
-type:type.value,
-price:price.value
-});
+btn.style.background="#198754";
+btn.innerText="Added";
 
-editId = null;
-clear();
+part.value="";
+desc.value="";
+make.value="";
+engine.value="";
+priceUSD.value="";
+
+await fetchData();
+
+setTimeout(()=>{
+btn.style.background="#495057";
+btn.innerText="Add / Update";
+},1000);
+
 };
 
-// DELETE
-window.deleteItem = async(id)=>{
+window.deleteItem=async(id)=>{
 await deleteDoc(doc(db,"parts",id));
+fetchData();
 };
 
-// EDIT
-window.editItem = (id)=>{
-let d = allData.find(x=>x.id===id);
-
+window.editItem=(id)=>{
+let d=data.find(x=>x.id===id);
 part.value=d.part;
 desc.value=d.desc;
 make.value=d.make;
 engine.value=d.engine;
 type.value=d.type;
-price.value=d.price;
-
+priceUSD.value=d.priceUSD;
 editId=id;
 };
 
-// CLEAR
-function clear(){
-part.value="";
-desc.value="";
-make.value="";
-engine.value="";
-price.value="";
+window.downloadCSV=()=>{
+let csv="Part No,Description,Car Make,Engine Model,Type,Price USD,Price EUR\n";
+
+data.forEach(d=>{
+csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
+});
+
+const blob=new Blob([csv],{type:"text/csv"});
+const a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="ziedel_price_list.csv";
+a.click();
+};
+
+document.getElementById("fileInput").addEventListener("change",function(e){
+const file=e.target.files[0];
+const reader=new FileReader();
+
+reader.onload=function(event){
+const lines=event.target.result.split("\n");
+
+lines.slice(1).forEach(async row=>{
+let cols=row.split(",");
+if(cols.length>=6){
+
+let usd=parseFloat(cols[5]);
+
+await addDoc(collection(db,"parts"),{
+part:cols[0],
+desc:cols[1],
+make:cols[2],
+engine:cols[3],
+type:cols[4],
+priceUSD:usd,
+priceEUR:(usd*0.92).toFixed(2)
+});
+
 }
+});
 
-// SEARCH
-search.addEventListener("keyup",render);
+fetchData();
+};
 
-// RENDER
+reader.readAsText(file);
+});
+
+window.openCustomer=()=>{
+const link=window.location.origin+window.location.pathname+"?view=customer";
+window.open(link,"_blank");
+};
+
+window.changeTheme=(t)=>{
+document.body.className=t==="default"?"":t;
+};
+
 function render(){
 
-let val = search.value.toLowerCase();
+let table=document.getElementById("table");
+table.innerHTML="";
 
-let filtered = allData.filter(d=>d.part.toLowerCase().includes(val));
+let searchVal=search.value.toLowerCase();
 
-table.innerHTML = `
+let filtered=data.filter(d=>d.part.toLowerCase().includes(searchVal));
+
+let chra=filtered.filter(d=>d.type==="CHRA");
+let turbo=filtered.filter(d=>d.type==="Turbocharger");
+
+renderSection("CHRA LIST",chra,"sectionCHRA");
+renderSection("TURBOCHARGER LIST",turbo,"sectionTurbo");
+
+}
+
+function renderSection(title,list,style){
+
+if(list.length===0) return;
+
+let table=document.getElementById("table");
+
+table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="${style}">${title}</td></tr>`;
+
+let grouped={};
+
+list.forEach(d=>{
+if(!grouped[d.make]) grouped[d.make]=[];
+grouped[d.make].push(d);
+});
+
+for(let make in grouped){
+
+table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="makeHeading">${make}</td></tr>`;
+
+table.innerHTML+=`
 <tr>
-<th>Part</th>
+<th>Part No</th>
 <th>Description</th>
-<th>Make</th>
-<th>Engine</th>
+<th>Car Make</th>
+<th>Engine Model</th>
 <th>Type</th>
 <th>Price</th>
-<th>Action</th>
+${isCustomer?"":"<th>Action</th>"}
 </tr>`;
 
-filtered.forEach(d=>{
-table.innerHTML += `
+grouped[make].forEach(d=>{
+table.innerHTML+=`
 <tr>
 <td>${d.part}</td>
 <td>${d.desc}</td>
 <td>${d.make}</td>
 <td>${d.engine}</td>
 <td>${d.type}</td>
-<td class="price">$${d.price}</td>
-<td>
+<td class="price">$${d.priceUSD} / €${d.priceEUR}</td>
+${isCustomer?"":`<td>
 <button onclick="editItem('${d.id}')">Edit</button>
 <button onclick="deleteItem('${d.id}')">Delete</button>
-</td>
+</td>`}
 </tr>`;
 });
+
+}
 
 }
 
