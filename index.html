@@ -51,6 +51,12 @@ color:white;
 border:none;
 border-radius:5px;
 cursor:pointer;
+transition:0.2s;
+}
+
+button:active{
+transform:scale(0.96);
+background:#343a40;
 }
 
 table{
@@ -93,13 +99,20 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <div id="loginBox">
 <input id="email" placeholder="Email"><br>
 <input id="password" type="password" placeholder="Password"><br>
-<button onclick="login()">Login</button>
-<button onclick="signup()">Signup</button>
+<button onclick="clickEffect(this);login()">Login</button>
+<button onclick="clickEffect(this);signup()">Signup</button>
 </div>
 
 <div id="adminControls" style="display:none;">
 
-<input id="search" placeholder="Search Part Number" onkeyup="render()">
+<input id="search" placeholder="Search Part Number">
+<button onclick="clickEffect(this);render()">Search</button>
+
+<select id="filterType">
+<option value="all">All Types</option>
+<option value="CHRA">CHRA</option>
+<option value="Turbocharger">Turbocharger</option>
+</select>
 
 <select onchange="changeTheme(this.value)">
 <option value="default">Theme</option>
@@ -126,13 +139,13 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <br>
 
 <button id="addBtn" onclick="addItem()">Add / Update</button>
-<button onclick="downloadCSV()">Download Excel</button>
+<button onclick="clickEffect(this);downloadCSV()">Download Excel</button>
 
 <input type="file" id="fileInput">
 
 <br>
 
-<button onclick="openCustomer()">Customer Catalog Link</button>
+<button onclick="clickEffect(this);openCustomer()">Customer Catalog Link</button>
 
 </div>
 
@@ -228,11 +241,13 @@ btn.innerText="Add / Update";
 };
 
 window.deleteItem=async(id)=>{
+clickEffect(event.target);
 await deleteDoc(doc(db,"parts",id));
 fetchData();
 };
 
 window.editItem=(id)=>{
+clickEffect(event.target);
 let d=data.find(x=>x.id===id);
 part.value=d.part;
 desc.value=d.desc;
@@ -257,38 +272,6 @@ a.download="ziedel_price_list.csv";
 a.click();
 };
 
-document.getElementById("fileInput").addEventListener("change",function(e){
-const file=e.target.files[0];
-const reader=new FileReader();
-
-reader.onload=function(event){
-const lines=event.target.result.split("\n");
-
-lines.slice(1).forEach(async row=>{
-let cols=row.split(",");
-if(cols.length>=6){
-
-let usd=parseFloat(cols[5]);
-
-await addDoc(collection(db,"parts"),{
-part:cols[0],
-desc:cols[1],
-make:cols[2],
-engine:cols[3],
-type:cols[4],
-priceUSD:usd,
-priceEUR:(usd*0.92).toFixed(2)
-});
-
-}
-});
-
-fetchData();
-};
-
-reader.readAsText(file);
-});
-
 window.openCustomer=()=>{
 const link=window.location.origin+window.location.pathname+"?view=customer";
 window.open(link,"_blank");
@@ -298,14 +281,26 @@ window.changeTheme=(t)=>{
 document.body.className=t==="default"?"":t;
 };
 
+function clickEffect(btn){
+btn.style.background="#198754";
+setTimeout(()=>{
+btn.style.background="#495057";
+},300);
+}
+
 function render(){
 
 let table=document.getElementById("table");
 table.innerHTML="";
 
-let searchVal=search.value.toLowerCase();
+let searchVal=document.getElementById("search").value.toLowerCase();
+let filterVal=document.getElementById("filterType").value;
 
-let filtered=data.filter(d=>d.part.toLowerCase().includes(searchVal));
+let filtered=data.filter(d=>{
+let matchSearch=d.part.toLowerCase().includes(searchVal);
+let matchType=filterVal==="all"?true:d.type===filterVal;
+return matchSearch && matchType;
+});
 
 let chra=filtered.filter(d=>d.type==="CHRA");
 let turbo=filtered.filter(d=>d.type==="Turbocharger");
