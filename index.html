@@ -17,20 +17,6 @@ color:white;
 padding:14px;
 border-radius:6px;
 text-align:center;
-font-size:30px;
-}
-
-.sectionCHRA,.sectionTurbo{
-background:#212529;
-color:white;
-font-size:20px;
-padding:10px;
-}
-
-.makeHeading{
-background:#E85D04;
-color:white;
-padding:8px;
 }
 
 input,select{
@@ -67,10 +53,7 @@ background:#495057;
 color:white;
 }
 
-.price{
-font-weight:bold;
-color:#2D6A4F;
-}
+.price{color:green;font-weight:bold;}
 
 </style>
 </head>
@@ -88,33 +71,42 @@ color:#2D6A4F;
 </div>
 
 <!-- ADMIN -->
-<div id="adminControls" style="display:none;">
+<div id="admin" style="display:none;">
 
-<input id="search" placeholder="Search Part Number">
+<input id="search" placeholder="Search Part">
 
 <br><br>
 
 <input id="part" placeholder="Part No">
 <input id="desc" placeholder="Description">
-<input id="make" placeholder="Car Make">
-<input id="engine" placeholder="Engine Model">
+<input id="make" placeholder="Make">
+<input id="engine" placeholder="Engine">
 
 <select id="type">
 <option>CHRA</option>
 <option>Turbocharger</option>
 </select>
 
-<input id="priceUSD" placeholder="Price ($)">
+<input id="price" placeholder="USD Price">
 
 <br>
 
-<button onclick="addItem()">Add Product</button>
-<button onclick="updateItem()">Update Product</button>
-<button onclick="downloadCSV()">Download Excel</button>
+<button onclick="addItem()">Add</button>
+<button onclick="updateItem()">Update</button>
 
 </div>
 
-<table id="table"></table>
+<table id="table">
+<tr>
+<th>Part</th>
+<th>Description</th>
+<th>Make</th>
+<th>Engine</th>
+<th>Type</th>
+<th>Price</th>
+<th>Action</th>
+</tr>
+</table>
 
 <script type="module">
 
@@ -122,9 +114,19 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// FIREBASE
+const app = initializeApp({
+apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
+authDomain: "ziedel-price-list.firebaseapp.com",
+projectId: "ziedel-price-list"
+});
+
+const auth = getAuth(app);
+const db = getFirestore(app);
+
 // ELEMENTS
 const loginBox = document.getElementById("loginBox");
-const adminControls = document.getElementById("adminControls");
+const admin = document.getElementById("admin");
 const table = document.getElementById("table");
 
 const email = document.getElementById("email");
@@ -135,138 +137,129 @@ const desc = document.getElementById("desc");
 const make = document.getElementById("make");
 const engine = document.getElementById("engine");
 const type = document.getElementById("type");
-const priceUSD = document.getElementById("priceUSD");
+const price = document.getElementById("price");
 const search = document.getElementById("search");
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
-  authDomain: "ziedel-price-list.firebaseapp.com",
-  projectId: "ziedel-price-list"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-let data = [];
 let editId = null;
+let allData = [];
 
 // AUTH
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    loginBox.style.display = "none";
-    adminControls.style.display = "block";
-    listenData();
-  }
+onAuthStateChanged(auth, user => {
+if(user){
+loginBox.style.display = "none";
+admin.style.display = "block";
+listen();
+}
 });
 
 // LOGIN
 window.login = () => signInWithEmailAndPassword(auth, email.value, password.value);
 window.signup = () => createUserWithEmailAndPassword(auth, email.value, password.value);
 
-// REAL-TIME LISTENER (NO LAG)
-function listenData() {
-  onSnapshot(collection(db, "parts"), (snapshot) => {
-    data = [];
-    snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
-    render();
-  });
+// REAL TIME
+function listen(){
+onSnapshot(collection(db,"parts"), snap=>{
+allData = [];
+snap.forEach(d => allData.push({id:d.id,...d.data()}));
+render();
+});
 }
 
 // ADD
-window.addItem = async () => {
-  let usd = parseFloat(priceUSD.value || 0);
-
-  await addDoc(collection(db, "parts"), {
-    part: part.value,
-    desc: desc.value,
-    make: make.value.toUpperCase(),
-    engine: engine.value.toUpperCase(),
-    type: type.value,
-    priceUSD: usd,
-    priceEUR: (usd * 0.92).toFixed(2)
-  });
-
-  clearForm();
+window.addItem = async ()=>{
+await addDoc(collection(db,"parts"),{
+part:part.value,
+desc:desc.value,
+make:make.value,
+engine:engine.value,
+type:type.value,
+price:price.value
+});
+clear();
 };
 
 // UPDATE
-window.updateItem = async () => {
-  if (!editId) return alert("Select item first");
+window.updateItem = async ()=>{
+if(!editId) return alert("Select item");
 
-  let usd = parseFloat(priceUSD.value || 0);
+await updateDoc(doc(db,"parts",editId),{
+part:part.value,
+desc:desc.value,
+make:make.value,
+engine:engine.value,
+type:type.value,
+price:price.value
+});
 
-  await updateDoc(doc(db, "parts", editId), {
-    part: part.value,
-    desc: desc.value,
-    make: make.value.toUpperCase(),
-    engine: engine.value.toUpperCase(),
-    type: type.value,
-    priceUSD: usd,
-    priceEUR: (usd * 0.92).toFixed(2)
-  });
-
-  editId = null;
-  clearForm();
+editId = null;
+clear();
 };
 
 // DELETE
-window.deleteItem = async (id) => {
-  if (confirm("Delete item?")) {
-    await deleteDoc(doc(db, "parts", id));
-  }
+window.deleteItem = async(id)=>{
+await deleteDoc(doc(db,"parts",id));
 };
 
 // EDIT
-window.editItem = (id) => {
-  let d = data.find(x => x.id === id);
+window.editItem = (id)=>{
+let d = allData.find(x=>x.id===id);
 
-  part.value = d.part;
-  desc.value = d.desc;
-  make.value = d.make;
-  engine.value = d.engine;
-  type.value = d.type;
-  priceUSD.value = d.priceUSD;
+part.value=d.part;
+desc.value=d.desc;
+make.value=d.make;
+engine.value=d.engine;
+type.value=d.type;
+price.value=d.price;
 
-  editId = id;
+editId=id;
 };
 
 // CLEAR
-function clearForm() {
-  part.value = "";
-  desc.value = "";
-  make.value = "";
-  engine.value = "";
-  priceUSD.value = "";
+function clear(){
+part.value="";
+desc.value="";
+make.value="";
+engine.value="";
+price.value="";
 }
 
 // SEARCH
-search.addEventListener("keyup", render);
+search.addEventListener("keyup",render);
 
 // RENDER
-function render() {
+function render(){
 
-  table.innerHTML = "";
+let val = search.value.toLowerCase();
 
-  let val = search.value.toLowerCase();
+let filtered = allData.filter(d=>d.part.toLowerCase().includes(val));
 
-  let filtered = data.filter(d => d.part.toLowerCase().includes(val));
+table.innerHTML = `
+<tr>
+<th>Part</th>
+<th>Description</th>
+<th>Make</th>
+<th>Engine</th>
+<th>Type</th>
+<th>Price</th>
+<th>Action</th>
+</tr>`;
 
-  filtered.forEach(d => {
-    table.innerHTML += `
+filtered.forEach(d=>{
+table.innerHTML += `
 <tr>
 <td>${d.part}</td>
 <td>${d.desc}</td>
 <td>${d.make}</td>
 <td>${d.engine}</td>
 <td>${d.type}</td>
-<td class="price">$${d.priceUSD} / €${d.priceEUR}</td>
+<td class="price">$${d.price}</td>
 <td>
 <button onclick="editItem('${d.id}')">Edit</button>
 <button onclick="deleteItem('${d.id}')">Delete</button>
 </td>
 </tr>`;
-  });
+});
+
 }
 
 </script>
