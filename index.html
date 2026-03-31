@@ -141,7 +141,9 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <button id="addBtn" onclick="addItem()">Add / Update</button>
 <button onclick="clickEffect(this);downloadCSV()">Download Excel</button>
 
+<!-- FILE UPLOAD WITH BUTTON -->
 <input type="file" id="fileInput">
+<button onclick="uploadFile(this)">Upload</button>
 
 <br>
 
@@ -238,6 +240,46 @@ btn.style.background="#495057";
 btn.innerText="Add / Update";
 },1000);
 
+};
+
+// FILE UPLOAD FUNCTION
+window.uploadFile=async(btn)=>{
+
+clickEffect(btn);
+
+const file=document.getElementById("fileInput").files[0];
+if(!file) return alert("Select file");
+
+const reader=new FileReader();
+
+reader.onload=async function(event){
+
+const lines=event.target.result.split("\n");
+
+for(let row of lines.slice(1)){
+let cols=row.split(",");
+if(cols.length>=6){
+
+let usd=parseFloat(cols[5]);
+
+await addDoc(collection(db,"parts"),{
+part:cols[0],
+desc:cols[1],
+make:cols[2],
+engine:cols[3],
+type:cols[4],
+priceUSD:usd,
+priceEUR:(usd*0.92).toFixed(2)
+});
+
+}
+}
+
+fetchData();
+
+};
+
+reader.readAsText(file);
 };
 
 window.deleteItem=async(id)=>{
