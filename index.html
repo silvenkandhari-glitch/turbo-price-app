@@ -8,11 +8,7 @@
 
 <style>
 
-body{
-font-family:Arial;
-background:#f5f5f5;
-padding:20px;
-}
+body{font-family:Arial;background:#f5f5f5;padding:20px;}
 
 h2{
 font-family:'Poppins';
@@ -76,13 +72,6 @@ font-weight:bold;
 color:#2D6A4F;
 }
 
-/* THEMES */
-body.dark{background:#121212;color:white;}
-body.dark table{background:#1f1f1f;color:white;}
-body.orange h2,body.orange .sectionCHRA,body.orange .sectionTurbo{background:#E85D04;}
-body.blue h2,body.blue .sectionCHRA,body.blue .sectionTurbo{background:#1971C2;}
-body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4F;}
-
 </style>
 </head>
 
@@ -101,15 +90,7 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <!-- ADMIN -->
 <div id="adminControls" style="display:none;">
 
-<input id="search" placeholder="Search Part Number" onkeyup="render()">
-
-<select onchange="changeTheme(this.value)">
-<option value="default">Theme</option>
-<option value="dark">Dark</option>
-<option value="orange">Orange</option>
-<option value="blue">Blue</option>
-<option value="green">Green</option>
-</select>
+<input id="search" placeholder="Search Part Number">
 
 <br><br>
 
@@ -127,14 +108,9 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 
 <br>
 
-<button onclick="addItem()">Add / Update</button>
+<button onclick="addItem()">Add Product</button>
+<button onclick="updateItem()">Update Product</button>
 <button onclick="downloadCSV()">Download Excel</button>
-
-<input type="file" id="fileInput">
-
-<br>
-
-<button onclick="openCustomer()">Customer Catalog Link</button>
 
 </div>
 
@@ -144,7 +120,23 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ELEMENTS
+const loginBox = document.getElementById("loginBox");
+const adminControls = document.getElementById("adminControls");
+const table = document.getElementById("table");
+
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+
+const part = document.getElementById("part");
+const desc = document.getElementById("desc");
+const make = document.getElementById("make");
+const engine = document.getElementById("engine");
+const type = document.getElementById("type");
+const priceUSD = document.getElementById("priceUSD");
+const search = document.getElementById("search");
 
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
@@ -156,192 +148,112 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let data=[];
-let editId=null;
-
-// CUSTOMER MODE
-const urlParams = new URLSearchParams(window.location.search);
-const isCustomer = urlParams.get("view") === "customer";
-
-if(isCustomer){
-document.getElementById("adminControls").style.display="none";
-}
+let data = [];
+let editId = null;
 
 // AUTH
-onAuthStateChanged(auth,async(user)=>{
-if(user){
-loginBox.style.display="none";
-adminControls.style.display="block";
-await fetchData();
-}
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    loginBox.style.display = "none";
+    adminControls.style.display = "block";
+    listenData();
+  }
 });
 
 // LOGIN
-window.login=()=>signInWithEmailAndPassword(auth,email.value,password.value);
-window.signup=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
+window.login = () => signInWithEmailAndPassword(auth, email.value, password.value);
+window.signup = () => createUserWithEmailAndPassword(auth, email.value, password.value);
 
-// FETCH
-async function fetchData(){
-let snap=await getDocs(collection(db,"parts"));
-data=[];
-snap.forEach(d=>data.push({id:d.id,...d.data()}));
-render();
+// REAL-TIME LISTENER (NO LAG)
+function listenData() {
+  onSnapshot(collection(db, "parts"), (snapshot) => {
+    data = [];
+    snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+    render();
+  });
 }
 
-// ADD / UPDATE
-window.addItem=async()=>{
-let usd=parseFloat(priceUSD.value);
-let eur=(usd*0.92).toFixed(2);
+// ADD
+window.addItem = async () => {
+  let usd = parseFloat(priceUSD.value || 0);
 
-let item={
-part:part.value,
-desc:desc.value,
-make:make.value.toUpperCase(),
-engine:engine.value.toUpperCase(),
-type:type.value,
-priceUSD:usd,
-priceEUR:eur
+  await addDoc(collection(db, "parts"), {
+    part: part.value,
+    desc: desc.value,
+    make: make.value.toUpperCase(),
+    engine: engine.value.toUpperCase(),
+    type: type.value,
+    priceUSD: usd,
+    priceEUR: (usd * 0.92).toFixed(2)
+  });
+
+  clearForm();
 };
 
-if(editId){
-await updateDoc(doc(db,"parts",editId),item);
-editId=null;
-}else{
-await addDoc(collection(db,"parts"),item);
-}
+// UPDATE
+window.updateItem = async () => {
+  if (!editId) return alert("Select item first");
 
-fetchData();
+  let usd = parseFloat(priceUSD.value || 0);
+
+  await updateDoc(doc(db, "parts", editId), {
+    part: part.value,
+    desc: desc.value,
+    make: make.value.toUpperCase(),
+    engine: engine.value.toUpperCase(),
+    type: type.value,
+    priceUSD: usd,
+    priceEUR: (usd * 0.92).toFixed(2)
+  });
+
+  editId = null;
+  clearForm();
 };
 
-// DELETE (with confirmation)
-window.deleteItem=async(id)=>{
-if(confirm("Are you sure you want to delete this item?")){
-await deleteDoc(doc(db,"parts",id));
-fetchData();
-}
+// DELETE
+window.deleteItem = async (id) => {
+  if (confirm("Delete item?")) {
+    await deleteDoc(doc(db, "parts", id));
+  }
 };
 
 // EDIT
-window.editItem=(id)=>{
-let d=data.find(x=>x.id===id);
-part.value=d.part;
-desc.value=d.desc;
-make.value=d.make;
-engine.value=d.engine;
-type.value=d.type;
-priceUSD.value=d.priceUSD;
-editId=id;
+window.editItem = (id) => {
+  let d = data.find(x => x.id === id);
+
+  part.value = d.part;
+  desc.value = d.desc;
+  make.value = d.make;
+  engine.value = d.engine;
+  type.value = d.type;
+  priceUSD.value = d.priceUSD;
+
+  editId = id;
 };
 
-// DOWNLOAD CSV
-window.downloadCSV=()=>{
-let csv="Part No,Description,Car Make,Engine Model,Type,Price USD,Price EUR\n";
-
-data.forEach(d=>{
-csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
-});
-
-const blob=new Blob([csv],{type:"text/csv"});
-const a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="ziedel_price_list.csv";
-a.click();
-};
-
-// UPLOAD CSV
-document.getElementById("fileInput").addEventListener("change",function(e){
-const file=e.target.files[0];
-const reader=new FileReader();
-
-reader.onload=function(event){
-const lines=event.target.result.split("\n");
-
-lines.slice(1).forEach(async row=>{
-let cols=row.split(",");
-if(cols.length>=6){
-
-let usd=parseFloat(cols[5]);
-
-await addDoc(collection(db,"parts"),{
-part:cols[0],
-desc:cols[1],
-make:cols[2],
-engine:cols[3],
-type:cols[4],
-priceUSD:usd,
-priceEUR:(usd*0.92).toFixed(2)
-});
-
+// CLEAR
+function clearForm() {
+  part.value = "";
+  desc.value = "";
+  make.value = "";
+  engine.value = "";
+  priceUSD.value = "";
 }
-});
 
-fetchData();
-};
-
-reader.readAsText(file);
-});
-
-// CUSTOMER LINK
-window.openCustomer=()=>{
-const link=window.location.origin+window.location.pathname+"?view=customer";
-window.open(link,"_blank");
-};
-
-// THEME
-window.changeTheme=(t)=>{
-document.body.className=t==="default"?"":t;
-};
+// SEARCH
+search.addEventListener("keyup", render);
 
 // RENDER
-function render(){
+function render() {
 
-let table=document.getElementById("table");
-table.innerHTML="";
+  table.innerHTML = "";
 
-let searchVal=search.value.toLowerCase();
+  let val = search.value.toLowerCase();
 
-let filtered=data.filter(d=>d.part.toLowerCase().includes(searchVal));
+  let filtered = data.filter(d => d.part.toLowerCase().includes(val));
 
-let chra=filtered.filter(d=>d.type==="CHRA");
-let turbo=filtered.filter(d=>d.type==="Turbocharger");
-
-renderSection("CHRA LIST",chra,"sectionCHRA");
-renderSection("TURBOCHARGER LIST",turbo,"sectionTurbo");
-
-}
-
-function renderSection(title,list,style){
-
-if(list.length===0) return;
-
-let table=document.getElementById("table");
-
-table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="${style}">${title}</td></tr>`;
-
-let grouped={};
-
-list.forEach(d=>{
-if(!grouped[d.make]) grouped[d.make]=[];
-grouped[d.make].push(d);
-});
-
-for(let make in grouped){
-
-table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="makeHeading">${make}</td></tr>`;
-
-table.innerHTML+=`
-<tr>
-<th>Part No</th>
-<th>Description</th>
-<th>Car Make</th>
-<th>Engine Model</th>
-<th>Type</th>
-<th>Price</th>
-${isCustomer?"":"<th>Action</th>"}
-</tr>`;
-
-grouped[make].forEach(d=>{
-table.innerHTML+=`
+  filtered.forEach(d => {
+    table.innerHTML += `
 <tr>
 <td>${d.part}</td>
 <td>${d.desc}</td>
@@ -349,15 +261,12 @@ table.innerHTML+=`
 <td>${d.engine}</td>
 <td>${d.type}</td>
 <td class="price">$${d.priceUSD} / €${d.priceEUR}</td>
-${isCustomer?"":`<td>
+<td>
 <button onclick="editItem('${d.id}')">Edit</button>
 <button onclick="deleteItem('${d.id}')">Delete</button>
-</td>`}
+</td>
 </tr>`;
-});
-
-}
-
+  });
 }
 
 </script>
