@@ -8,8 +8,6 @@
 <style>
 body{font-family:Arial;background:#f5f5f5;padding:20px;}
 h2{font-family:'Poppins';background:#212529;color:white;padding:14px;border-radius:6px;text-align:center;font-size:30px;}
-.sectionCHRA,.sectionTurbo{background:#212529;color:white;font-size:20px;padding:10px;}
-.makeHeading{background:#E85D04;color:white;padding:8px;}
 input,select{padding:8px;margin:5px;width:170px;}
 button{padding:8px 14px;margin:5px;background:#495057;color:white;border:none;border-radius:5px;cursor:pointer;}
 table{margin-top:10px;border-collapse:collapse;width:100%;background:white;}
@@ -33,9 +31,9 @@ th{background:#495057;color:white;}
 
 <div id="adminControls" style="display:none;">
 
-<input id="search" placeholder="Search Part Number" oninput="render()">
+<input id="search" placeholder="Search anything...">
 
-<select id="filterType" onchange="render()">
+<select id="filterType">
 <option value="all">All Types</option>
 <option value="CHRA">CHRA</option>
 <option value="Turbocharger">Turbocharger</option>
@@ -57,8 +55,8 @@ th{background:#495057;color:white;}
 
 <br>
 
-<button id="addBtn" onclick="addItem()">Add</button>
-<button id="updateBtn" onclick="updateItem()" style="display:none;">Update</button>
+<button id="addBtn">Add</button>
+<button id="updateBtn" style="display:none;">Update</button>
 
 </div>
 
@@ -70,6 +68,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// ✅ YOUR FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -83,6 +82,7 @@ const db = getFirestore(app);
 let data = [];
 let editId = null;
 
+// AUTH STATE
 onAuthStateChanged(auth, async(user)=>{
 if(user){
 loginBox.style.display="none";
@@ -91,9 +91,11 @@ await fetchData();
 }
 });
 
+// LOGIN / SIGNUP
 window.login = ()=>signInWithEmailAndPassword(auth,email.value,password.value);
 window.signup = ()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 
+// FETCH DATA
 async function fetchData(){
 let snap = await getDocs(collection(db,"parts"));
 data = [];
@@ -101,6 +103,7 @@ snap.forEach(d=>data.push({id:d.id,...d.data()}));
 render();
 }
 
+// CLEAR FORM
 function clearForm(){
 part.value="";
 desc.value="";
@@ -108,9 +111,13 @@ make.value="";
 engine.value="";
 priceUSD.value="";
 type.value="CHRA";
+editId = null;
+addBtn.style.display="inline-block";
+updateBtn.style.display="none";
 }
 
-window.addItem = async()=>{
+// ADD ITEM
+addBtn.onclick = async()=>{
 let usd = parseFloat(priceUSD.value);
 if(!usd) return alert("Enter price");
 
@@ -124,13 +131,17 @@ priceUSD:usd,
 priceEUR:(usd*0.92).toFixed(2)
 };
 
-await addDoc(collection(db,"parts"),item);
+let docRef = await addDoc(collection(db,"parts"),item);
 
+// instant update
+data.push({ id: docRef.id, ...item });
+
+render();
 clearForm();
-await fetchData();
 };
 
-window.updateItem = async()=>{
+// UPDATE ITEM
+updateBtn.onclick = async()=>{
 let usd = parseFloat(priceUSD.value);
 
 let item = {
@@ -145,15 +156,14 @@ priceEUR:(usd*0.92).toFixed(2)
 
 await updateDoc(doc(db,"parts",editId),item);
 
-editId = null;
+// update locally
+data = data.map(d => d.id === editId ? { id: editId, ...item } : d);
 
+render();
 clearForm();
-await fetchData();
-
-addBtn.style.display="inline-block";
-updateBtn.style.display="none";
 };
 
+// EDIT
 window.editItem = (id)=>{
 let d = data.find(x=>x.id===id);
 
@@ -170,26 +180,34 @@ addBtn.style.display="none";
 updateBtn.style.display="inline-block";
 };
 
+// DELETE
 window.deleteItem = async(id)=>{
 await deleteDoc(doc(db,"parts",id));
-fetchData();
+
+data = data.filter(d => d.id !== id);
+render();
 };
 
+// RENDER
 function render(){
 
 let table=document.getElementById("table");
-table.innerHTML="";
-
 let searchVal=document.getElementById("search").value.toLowerCase();
 let filterVal=document.getElementById("filterType").value;
 
 let filtered=data.filter(d=>{
-let matchSearch=!searchVal || d.part.toLowerCase().startsWith(searchVal);
-let matchType=filterVal==="all" || d.type===filterVal;
+let matchSearch = !searchVal || 
+d.part.toLowerCase().includes(searchVal) ||
+d.desc.toLowerCase().includes(searchVal) ||
+d.make.toLowerCase().includes(searchVal) ||
+d.engine.toLowerCase().includes(searchVal);
+
+let matchType = filterVal==="all" || d.type===filterVal;
+
 return matchSearch && matchType;
 });
 
-table.innerHTML=`
+table.innerHTML = `
 <tr>
 <th>Part No</th>
 <th>Description</th>
@@ -217,8 +235,27 @@ table.innerHTML+=`
 </tr>
 `;
 });
-
 }
+
+// ENTER KEY
+document.querySelectorAll("#adminControls input").forEach(input => {
+input.addEventListener("keypress", function(e) {
+if (e.key === "Enter") {
+e.preventDefault();
+if (editId) updateBtn.onclick();
+else addBtn.onclick();
+}
+});
+});
+
+// FAST SEARCH
+let timeout;
+search.addEventListener("input", ()=>{
+clearTimeout(timeout);
+timeout = setTimeout(render, 120);
+});
+
+filterType.addEventListener("change", render);
 
 </script>
 
