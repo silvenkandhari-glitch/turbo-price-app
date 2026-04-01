@@ -28,8 +28,8 @@ th{background:#495057;color:white;}
 <div id="loginBox">
 <input id="email" placeholder="Email"><br>
 <input id="password" type="password" placeholder="Password"><br>
-<button onclick="login()">Login</button>
-<button onclick="signup()">Signup</button>
+<button id="loginBtn">Login</button>
+<button id="signupBtn">Signup</button>
 </div>
 
 <div id="adminControls" style="display:none;">
@@ -63,13 +63,13 @@ th{background:#495057;color:white;}
 
 <br><br>
 
-<button onclick="downloadCSV()">Download Excel</button>
+<button id="downloadBtn">Download Excel</button>
 <input type="file" id="fileInput">
-<button onclick="uploadFile()">Upload</button>
+<button id="uploadBtn">Upload</button>
 
 <br>
 
-<button onclick="openCustomer()">Customer Catalog Link</button>
+<button id="customerBtn">Customer Catalog Link</button>
 
 </div>
 
@@ -81,6 +81,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -91,10 +92,40 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// DOM
+const loginBox = document.getElementById("loginBox");
+const adminControls = document.getElementById("adminControls");
+
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+
+const search = document.getElementById("search");
+const filterType = document.getElementById("filterType");
+
+const part = document.getElementById("part");
+const desc = document.getElementById("desc");
+const make = document.getElementById("make");
+const engine = document.getElementById("engine");
+const type = document.getElementById("type");
+const priceUSD = document.getElementById("priceUSD");
+
+const addBtn = document.getElementById("addBtn");
+const updateBtn = document.getElementById("updateBtn");
+
+const table = document.getElementById("table");
+
 let data = [];
 let editId = null;
 
 // AUTH
+document.getElementById("loginBtn").onclick = ()=>{
+signInWithEmailAndPassword(auth,email.value,password.value);
+};
+
+document.getElementById("signupBtn").onclick = ()=>{
+createUserWithEmailAndPassword(auth,email.value,password.value);
+};
+
 onAuthStateChanged(auth, async(user)=>{
 if(user){
 loginBox.style.display="none";
@@ -102,9 +133,6 @@ adminControls.style.display="block";
 await fetchData();
 }
 });
-
-window.login = ()=>signInWithEmailAndPassword(auth,email.value,password.value);
-window.signup = ()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 
 // FETCH
 async function fetchData(){
@@ -129,8 +157,8 @@ priceUSD:usd,
 priceEUR:(usd*0.92).toFixed(2)
 };
 
-let docRef = await addDoc(collection(db,"parts"),item);
-data.push({id:docRef.id,...item});
+let ref = await addDoc(collection(db,"parts"),item);
+data.push({id:ref.id,...item});
 
 render();
 clearForm();
@@ -152,7 +180,7 @@ priceEUR:(usd*0.92).toFixed(2)
 
 await updateDoc(doc(db,"parts",editId),item);
 
-data = data.map(d => d.id===editId ? {id:editId,...item} : d);
+data = data.map(d=>d.id===editId ? {id:editId,...item} : d);
 
 render();
 clearForm();
@@ -194,7 +222,7 @@ updateBtn.style.display="none";
 }
 
 // CSV DOWNLOAD
-window.downloadCSV=()=>{
+document.getElementById("downloadBtn").onclick=()=>{
 let csv="Part,Desc,Make,Engine,Type,USD,EUR\n";
 data.forEach(d=>{
 csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
@@ -207,8 +235,8 @@ a.click();
 };
 
 // CSV UPLOAD
-window.uploadFile=()=>{
-const file=fileInput.files[0];
+document.getElementById("uploadBtn").onclick=()=>{
+const file=document.getElementById("fileInput").files[0];
 if(!file) return alert("Select file");
 
 const reader=new FileReader();
@@ -236,28 +264,24 @@ reader.readAsText(file);
 };
 
 // CUSTOMER LINK
-window.openCustomer=()=>{
+document.getElementById("customerBtn").onclick=()=>{
 let link=window.location.origin+window.location.pathname+"?view=customer";
 window.open(link,"_blank");
 };
 
 // RENDER
 function render(){
-let table=document.getElementById("table");
 
 let searchVal=search.value.toLowerCase();
 let filterVal=filterType.value;
 
 let filtered=data.filter(d=>{
-let matchSearch =
+return (
 d.part.toLowerCase().includes(searchVal) ||
 d.desc.toLowerCase().includes(searchVal) ||
 d.make.toLowerCase().includes(searchVal) ||
-d.engine.toLowerCase().includes(searchVal);
-
-let matchType = filterVal==="all" || d.type===filterVal;
-
-return matchSearch && matchType;
+d.engine.toLowerCase().includes(searchVal)
+) && (filterVal==="all" || d.type===filterVal);
 });
 
 table.innerHTML=`
@@ -290,7 +314,7 @@ table.innerHTML+=`
 });
 }
 
-// SEARCH LIVE
+// SEARCH
 search.addEventListener("input",render);
 filterType.addEventListener("change",render);
 
