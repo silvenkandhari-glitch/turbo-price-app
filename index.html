@@ -51,12 +51,6 @@ color:white;
 border:none;
 border-radius:5px;
 cursor:pointer;
-transition:0.2s;
-}
-
-button:active{
-transform:scale(0.96);
-background:#343a40;
 }
 
 table{
@@ -82,12 +76,19 @@ font-weight:bold;
 color:#2D6A4F;
 }
 
-/* THEMES */
-body.dark{background:#121212;color:white;}
-body.dark table{background:#1f1f1f;color:white;}
-body.orange h2,body.orange .sectionCHRA,body.orange .sectionTurbo{background:#E85D04;}
-body.blue h2,body.blue .sectionCHRA,body.blue .sectionTurbo{background:#1971C2;}
-body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4F;}
+#suggestions{
+background:white;
+position:absolute;
+z-index:1000;
+width:170px;
+border:1px solid #ccc;
+max-height:200px;
+overflow-y:auto;
+}
+
+#suggestions div:hover{
+background:#f1f1f1;
+}
 
 </style>
 </head>
@@ -99,27 +100,23 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <div id="loginBox">
 <input id="email" placeholder="Email"><br>
 <input id="password" type="password" placeholder="Password"><br>
-<button onclick="clickEffect(this);login()">Login</button>
-<button onclick="clickEffect(this);signup()">Signup</button>
+<button onclick="login()">Login</button>
+<button onclick="signup()">Signup</button>
 </div>
 
 <div id="adminControls" style="display:none;">
 
+<div style="position:relative;">
 <input id="search" placeholder="Search Part Number">
-<button onclick="clickEffect(this);render()">Search</button>
+<div id="suggestions"></div>
+</div>
+
+<button onclick="render()">Search</button>
 
 <select id="filterType">
 <option value="all">All Types</option>
 <option value="CHRA">CHRA</option>
 <option value="Turbocharger">Turbocharger</option>
-</select>
-
-<select onchange="changeTheme(this.value)">
-<option value="default">Theme</option>
-<option value="dark">Dark</option>
-<option value="orange">Orange</option>
-<option value="blue">Blue</option>
-<option value="green">Green</option>
 </select>
 
 <br><br>
@@ -139,15 +136,6 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 <br>
 
 <button id="addBtn" onclick="addItem()">Add / Update</button>
-<button onclick="clickEffect(this);downloadCSV()">Download Excel</button>
-
-<!-- FILE UPLOAD WITH BUTTON -->
-<input type="file" id="fileInput">
-<button onclick="uploadFile(this)">Upload</button>
-
-<br>
-
-<button onclick="clickEffect(this);openCustomer()">Customer Catalog Link</button>
 
 </div>
 
@@ -157,12 +145,12 @@ body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
-  authDomain: "ziedel-price-list.firebaseapp.com",
-  projectId: "ziedel-price-list"
+apiKey: "YOUR KEY",
+authDomain: "YOUR DOMAIN",
+projectId: "YOUR PROJECT"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -170,14 +158,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let data=[];
-let editId=null;
 
-const urlParams = new URLSearchParams(window.location.search);
-const isCustomer = urlParams.get("view") === "customer";
-
-if(isCustomer){
-document.getElementById("adminControls").style.display="none";
-}
+window.login=()=>signInWithEmailAndPassword(auth,email.value,password.value);
+window.signup=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 
 onAuthStateChanged(auth,async(user)=>{
 if(user){
@@ -187,9 +170,6 @@ await fetchData();
 }
 });
 
-window.login=()=>signInWithEmailAndPassword(auth,email.value,password.value);
-window.signup=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
-
 async function fetchData(){
 let snap=await getDocs(collection(db,"parts"));
 data=[];
@@ -197,35 +177,62 @@ snap.forEach(d=>data.push({id:d.id,...d.data()}));
 render();
 }
 
+// 🔍 LIVE SEARCH DROPDOWN
+let debounceTimer;
+
+document.getElementById("search").addEventListener("input", function () {
+clearTimeout(debounceTimer);
+debounceTimer = setTimeout(showSuggestions, 200);
+});
+
+function showSuggestions(){
+
+let val = search.value.toLowerCase();
+let box = document.getElementById("suggestions");
+
+box.innerHTML="";
+
+if(!val) return;
+
+let matches = data.filter(d=>d.part.toLowerCase().includes(val)).slice(0,8);
+
+matches.forEach(d=>{
+let div=document.createElement("div");
+div.innerText=d.part;
+div.style.padding="6px";
+div.style.cursor="pointer";
+
+div.onclick=()=>{
+search.value=d.part;
+box.innerHTML="";
+render();
+};
+
+box.appendChild(div);
+});
+}
+
+// CLOSE DROPDOWN
+document.addEventListener("click",function(e){
+if(!e.target.closest("#search")){
+suggestions.innerHTML="";
+}
+});
+
+// ADD ITEM
 window.addItem=async()=>{
 
-let btn=document.getElementById("addBtn");
-
-btn.style.background="#2D6A4F";
-btn.innerText="Adding...";
-
 let usd=parseFloat(priceUSD.value);
-let eur=(usd*0.92).toFixed(2);
 
-let item={
+await addDoc(collection(db,"parts"),{
 part:part.value,
 desc:desc.value,
 make:make.value.toUpperCase(),
 engine:engine.value.toUpperCase(),
 type:type.value,
 priceUSD:usd,
-priceEUR:eur
-};
-
-if(editId){
-await updateDoc(doc(db,"parts",editId),item);
-editId=null;
-}else{
-await addDoc(collection(db,"parts"),item);
-}
-
-btn.style.background="#198754";
-btn.innerText="Added";
+priceEUR:(usd*0.92).toFixed(2)
+});
 
 part.value="";
 desc.value="";
@@ -233,173 +240,60 @@ make.value="";
 engine.value="";
 priceUSD.value="";
 
-await fetchData();
-
-setTimeout(()=>{
-btn.style.background="#495057";
-btn.innerText="Add / Update";
-},1000);
-
-};
-
-// FILE UPLOAD FUNCTION
-window.uploadFile=async(btn)=>{
-
-clickEffect(btn);
-
-const file=document.getElementById("fileInput").files[0];
-if(!file) return alert("Select file");
-
-const reader=new FileReader();
-
-reader.onload=async function(event){
-
-const lines=event.target.result.split("\n");
-
-for(let row of lines.slice(1)){
-let cols=row.split(",");
-if(cols.length>=6){
-
-let usd=parseFloat(cols[5]);
-
-await addDoc(collection(db,"parts"),{
-part:cols[0],
-desc:cols[1],
-make:cols[2],
-engine:cols[3],
-type:cols[4],
-priceUSD:usd,
-priceEUR:(usd*0.92).toFixed(2)
-});
-
-}
-}
-
-fetchData();
-
-};
-
-reader.readAsText(file);
-};
-
-window.deleteItem=async(id)=>{
-clickEffect(event.target);
-await deleteDoc(doc(db,"parts",id));
 fetchData();
 };
 
-window.editItem=(id)=>{
-clickEffect(event.target);
-let d=data.find(x=>x.id===id);
-part.value=d.part;
-desc.value=d.desc;
-make.value=d.make;
-engine.value=d.engine;
-type.value=d.type;
-priceUSD.value=d.priceUSD;
-editId=id;
-};
-
-window.downloadCSV=()=>{
-let csv="Part No,Description,Car Make,Engine Model,Type,Price USD,Price EUR\n";
-
-data.forEach(d=>{
-csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
-});
-
-const blob=new Blob([csv],{type:"text/csv"});
-const a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="ziedel_price_list.csv";
-a.click();
-};
-
-window.openCustomer=()=>{
-const link=window.location.origin+window.location.pathname+"?view=customer";
-window.open(link,"_blank");
-};
-
-window.changeTheme=(t)=>{
-document.body.className=t==="default"?"":t;
-};
-
-function clickEffect(btn){
-btn.style.background="#198754";
-setTimeout(()=>{
-btn.style.background="#495057";
-},300);
-}
-
+// ⚡ FAST RENDER
 function render(){
 
 let table=document.getElementById("table");
 table.innerHTML="";
 
-let searchVal=document.getElementById("search").value.toLowerCase();
-let filterVal=document.getElementById("filterType").value;
+let searchVal=search.value.toLowerCase();
+let filterVal=filterType.value;
 
-let filtered=data.filter(d=>{
-let matchSearch=d.part.toLowerCase().includes(searchVal);
-let matchType=filterVal==="all"?true:d.type===filterVal;
-return matchSearch && matchType;
-});
+let filtered=[];
 
-let chra=filtered.filter(d=>d.type==="CHRA");
-let turbo=filtered.filter(d=>d.type==="Turbocharger");
+for(let i=0;i<data.length;i++){
+let d=data[i];
 
-renderSection("CHRA LIST",chra,"sectionCHRA");
-renderSection("TURBOCHARGER LIST",turbo,"sectionTurbo");
-
+if(d.part.toLowerCase().includes(searchVal) &&
+(filterVal==="all" || d.type===filterVal)){
+filtered.push(d);
+}
 }
 
+renderSection("CHRA LIST",filtered.filter(d=>d.type==="CHRA"),"sectionCHRA");
+renderSection("TURBO LIST",filtered.filter(d=>d.type==="Turbocharger"),"sectionTurbo");
+}
+
+// ⚡ FAST SECTION RENDER
 function renderSection(title,list,style){
 
 if(list.length===0) return;
 
 let table=document.getElementById("table");
 
-table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="${style}">${title}</td></tr>`;
-
-let grouped={};
+let headerRow=document.createElement("tr");
+headerRow.innerHTML=`<td colspan="6" class="${style}">${title}</td>`;
+table.appendChild(headerRow);
 
 list.forEach(d=>{
-if(!grouped[d.make]) grouped[d.make]=[];
-grouped[d.make].push(d);
-});
 
-for(let make in grouped){
+let tr=document.createElement("tr");
 
-table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="makeHeading">${make}</td></tr>`;
-
-table.innerHTML+=`
-<tr>
-<th>Part No</th>
-<th>Description</th>
-<th>Car Make</th>
-<th>Engine Model</th>
-<th>Type</th>
-<th>Price</th>
-${isCustomer?"":"<th>Action</th>"}
-</tr>`;
-
-grouped[make].forEach(d=>{
-table.innerHTML+=`
-<tr>
+tr.innerHTML=`
 <td>${d.part}</td>
 <td>${d.desc}</td>
 <td>${d.make}</td>
 <td>${d.engine}</td>
 <td>${d.type}</td>
 <td class="price">$${d.priceUSD} / €${d.priceEUR}</td>
-${isCustomer?"":`<td>
-<button onclick="editItem('${d.id}')">Edit</button>
-<button onclick="deleteItem('${d.id}')">Delete</button>
-</td>`}
-</tr>`;
+`;
+
+table.appendChild(tr);
+
 });
-
-}
-
 }
 
 </script>
