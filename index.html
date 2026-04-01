@@ -81,7 +81,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// FIREBASE CONFIG
+// 🔥 CHECK CUSTOMER MODE
+const urlParams = new URLSearchParams(window.location.search);
+const isCustomer = urlParams.get("view") === "customer";
+
+// FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -116,6 +120,13 @@ const table = document.getElementById("table");
 let data = [];
 let editId = null;
 
+// 🔥 CUSTOMER MODE (NO LOGIN)
+if(isCustomer){
+loginBox.style.display="none";
+adminControls.style.display="none";
+fetchData();
+}
+
 // LOGIN
 document.getElementById("loginBtn").onclick = ()=>{
 signInWithEmailAndPassword(auth,email.value,password.value)
@@ -128,20 +139,18 @@ createUserWithEmailAndPassword(auth,email.value,password.value)
 .catch(err=>alert(err.message));
 };
 
-// AUTH STATE
+// AUTH
 onAuthStateChanged(auth, async(user)=>{
-if(user){
+if(user && !isCustomer){
 loginBox.style.display="none";
 adminControls.style.display="block";
 await fetchData();
-}else{
-adminControls.style.display="none";
 }
 });
 
-// FETCH (LIMITED = FAST)
+// FETCH
 async function fetchData(){
-let q = query(collection(db,"parts"), limit(200)); // 🔥 SPEED FIX
+let q = query(collection(db,"parts"), limit(200));
 let snap = await getDocs(q);
 
 data = [];
@@ -229,7 +238,7 @@ addBtn.style.display="inline-block";
 updateBtn.style.display="none";
 }
 
-// DOWNLOAD CSV
+// DOWNLOAD
 document.getElementById("downloadBtn").onclick=()=>{
 let csv="Part,Desc,Make,Engine,Type,USD,EUR\n";
 data.forEach(d=>{
@@ -242,7 +251,7 @@ a.download="ziedel_price_list.csv";
 a.click();
 };
 
-// UPLOAD CSV
+// UPLOAD
 document.getElementById("uploadBtn").onclick=()=>{
 const file=document.getElementById("fileInput").files[0];
 if(!file) return alert("Select file");
@@ -271,7 +280,7 @@ fetchData();
 reader.readAsText(file);
 };
 
-// CUSTOMER LINK
+// CUSTOMER LINK BUTTON
 document.getElementById("customerBtn").onclick=()=>{
 let link=window.location.origin+window.location.pathname+"?view=customer";
 window.open(link,"_blank");
@@ -279,11 +288,6 @@ window.open(link,"_blank");
 
 // RENDER
 function render(){
-
-if(!data.length){
-table.innerHTML="<tr><td>Loading...</td></tr>";
-return;
-}
 
 let searchVal=search.value.toLowerCase();
 let filterVal=filterType.value;
@@ -305,7 +309,7 @@ table.innerHTML=`
 <th>Engine</th>
 <th>Type</th>
 <th>Price</th>
-<th>Action</th>
+${isCustomer ? "" : "<th>Action</th>"}
 </tr>
 `;
 
@@ -318,16 +322,17 @@ table.innerHTML+=`
 <td>${d.engine}</td>
 <td>${d.type}</td>
 <td class="price">$${d.priceUSD} / €${d.priceEUR}</td>
+${isCustomer ? "" : `
 <td>
 <button onclick="editItem('${d.id}')">Edit</button>
 <button onclick="deleteItem('${d.id}')">Delete</button>
-</td>
+</td>`}
 </tr>
 `;
 });
 }
 
-// SMOOTH SEARCH
+// SEARCH
 let timeout;
 search.addEventListener("input", ()=>{
 clearTimeout(timeout);
