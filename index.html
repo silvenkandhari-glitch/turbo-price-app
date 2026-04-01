@@ -3,13 +3,16 @@
 <head>
 
 <title>ZIEDEL PRICE LIST</title>
+
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
 body{font-family:Arial;background:#f5f5f5;padding:20px;}
 h2{font-family:'Poppins';background:#212529;color:white;padding:14px;border-radius:6px;text-align:center;font-size:30px;}
+
 input,select{padding:8px;margin:5px;width:170px;}
 button{padding:8px 14px;margin:5px;background:#495057;color:white;border:none;border-radius:5px;cursor:pointer;}
+
 table{margin-top:10px;border-collapse:collapse;width:100%;background:white;}
 th,td{border:1px solid #ddd;padding:8px;text-align:center;}
 th{background:#495057;color:white;}
@@ -58,6 +61,16 @@ th{background:#495057;color:white;}
 <button id="addBtn">Add</button>
 <button id="updateBtn" style="display:none;">Update</button>
 
+<br><br>
+
+<button onclick="downloadCSV()">Download Excel</button>
+<input type="file" id="fileInput">
+<button onclick="uploadFile()">Upload</button>
+
+<br>
+
+<button onclick="openCustomer()">Customer Catalog Link</button>
+
 </div>
 
 <table id="table"></table>
@@ -68,7 +81,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 YOUR FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -82,75 +94,28 @@ const db = getFirestore(app);
 let data = [];
 let editId = null;
 
-// 🔥 AUTH STATE
+// AUTH
 onAuthStateChanged(auth, async(user)=>{
-console.log("AUTH STATE:", user);
-
 if(user){
 loginBox.style.display="none";
 adminControls.style.display="block";
 await fetchData();
-}else{
-console.log("NOT LOGGED IN");
 }
 });
 
-// 🔥 LOGIN
-window.login = ()=>{
-signInWithEmailAndPassword(auth,email.value,password.value)
-.then(()=>console.log("LOGIN SUCCESS"))
-.catch(err=>{
-console.error(err);
-alert(err.message);
-});
-};
+window.login = ()=>signInWithEmailAndPassword(auth,email.value,password.value);
+window.signup = ()=>createUserWithEmailAndPassword(auth,email.value,password.value);
 
-// 🔥 SIGNUP
-window.signup = ()=>{
-createUserWithEmailAndPassword(auth,email.value,password.value)
-.then(()=>console.log("SIGNUP SUCCESS"))
-.catch(err=>{
-console.error(err);
-alert(err.message);
-});
-};
-
-// 🔥 FETCH DATA
+// FETCH
 async function fetchData(){
-try {
-console.log("Fetching data...");
-
 let snap = await getDocs(collection(db,"parts"));
-
 data = [];
 snap.forEach(d=>data.push({id:d.id,...d.data()}));
-
-console.log("DATA LOADED:", data);
-
 render();
-
-} catch(e){
-console.error("FETCH ERROR:", e);
-alert(e.message);
-}
-}
-
-// CLEAR FORM
-function clearForm(){
-part.value="";
-desc.value="";
-make.value="";
-engine.value="";
-priceUSD.value="";
-type.value="CHRA";
-editId = null;
-addBtn.style.display="inline-block";
-updateBtn.style.display="none";
 }
 
 // ADD
 addBtn.onclick = async()=>{
-try{
 let usd = parseFloat(priceUSD.value);
 if(!usd) return alert("Enter price");
 
@@ -165,23 +130,14 @@ priceEUR:(usd*0.92).toFixed(2)
 };
 
 let docRef = await addDoc(collection(db,"parts"),item);
-
-data.push({ id: docRef.id, ...item });
+data.push({id:docRef.id,...item});
 
 render();
 clearForm();
-
-console.log("ADDED:", item);
-
-}catch(e){
-console.error("ADD ERROR:", e);
-alert(e.message);
-}
 };
 
 // UPDATE
 updateBtn.onclick = async()=>{
-try{
 let usd = parseFloat(priceUSD.value);
 
 let item = {
@@ -196,17 +152,17 @@ priceEUR:(usd*0.92).toFixed(2)
 
 await updateDoc(doc(db,"parts",editId),item);
 
-data = data.map(d => d.id === editId ? { id: editId, ...item } : d);
+data = data.map(d => d.id===editId ? {id:editId,...item} : d);
 
 render();
 clearForm();
+};
 
-console.log("UPDATED:", item);
-
-}catch(e){
-console.error("UPDATE ERROR:", e);
-alert(e.message);
-}
+// DELETE
+window.deleteItem = async(id)=>{
+await deleteDoc(doc(db,"parts",id));
+data = data.filter(d=>d.id!==id);
+render();
 };
 
 // EDIT
@@ -221,36 +177,79 @@ type.value=d.type;
 priceUSD.value=d.priceUSD;
 
 editId=id;
-
 addBtn.style.display="none";
 updateBtn.style.display="inline-block";
 };
 
-// DELETE
-window.deleteItem = async(id)=>{
-try{
-await deleteDoc(doc(db,"parts",id));
-
-data = data.filter(d => d.id !== id);
-render();
-
-console.log("DELETED:", id);
-
-}catch(e){
-console.error("DELETE ERROR:", e);
-alert(e.message);
+// CLEAR
+function clearForm(){
+part.value="";
+desc.value="";
+make.value="";
+engine.value="";
+priceUSD.value="";
+editId=null;
+addBtn.style.display="inline-block";
+updateBtn.style.display="none";
 }
+
+// CSV DOWNLOAD
+window.downloadCSV=()=>{
+let csv="Part,Desc,Make,Engine,Type,USD,EUR\n";
+data.forEach(d=>{
+csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
+});
+const blob=new Blob([csv]);
+const a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="ziedel_price_list.csv";
+a.click();
+};
+
+// CSV UPLOAD
+window.uploadFile=()=>{
+const file=fileInput.files[0];
+if(!file) return alert("Select file");
+
+const reader=new FileReader();
+reader.onload=async(e)=>{
+let rows=e.target.result.split("\n");
+
+for(let r of rows.slice(1)){
+let c=r.split(",");
+if(c.length>=6){
+let usd=parseFloat(c[5]);
+await addDoc(collection(db,"parts"),{
+part:c[0],
+desc:c[1],
+make:c[2],
+engine:c[3],
+type:c[4],
+priceUSD:usd,
+priceEUR:(usd*0.92).toFixed(2)
+});
+}
+}
+fetchData();
+};
+reader.readAsText(file);
+};
+
+// CUSTOMER LINK
+window.openCustomer=()=>{
+let link=window.location.origin+window.location.pathname+"?view=customer";
+window.open(link,"_blank");
 };
 
 // RENDER
 function render(){
-
 let table=document.getElementById("table");
-let searchVal=document.getElementById("search").value.toLowerCase();
-let filterVal=document.getElementById("filterType").value;
+
+let searchVal=search.value.toLowerCase();
+let filterVal=filterType.value;
 
 let filtered=data.filter(d=>{
-let matchSearch = !searchVal || 
+let matchSearch =
 d.part.toLowerCase().includes(searchVal) ||
 d.desc.toLowerCase().includes(searchVal) ||
 d.make.toLowerCase().includes(searchVal) ||
@@ -261,9 +260,9 @@ let matchType = filterVal==="all" || d.type===filterVal;
 return matchSearch && matchType;
 });
 
-table.innerHTML = `
+table.innerHTML=`
 <tr>
-<th>Part No</th>
+<th>Part</th>
 <th>Description</th>
 <th>Make</th>
 <th>Engine</th>
@@ -291,25 +290,9 @@ table.innerHTML+=`
 });
 }
 
-// ENTER KEY
-document.querySelectorAll("#adminControls input").forEach(input => {
-input.addEventListener("keypress", function(e) {
-if (e.key === "Enter") {
-e.preventDefault();
-if (editId) updateBtn.onclick();
-else addBtn.onclick();
-}
-});
-});
-
-// SEARCH
-let timeout;
-search.addEventListener("input", ()=>{
-clearTimeout(timeout);
-timeout = setTimeout(render, 120);
-});
-
-filterType.addEventListener("change", render);
+// SEARCH LIVE
+search.addEventListener("input",render);
+filterType.addEventListener("change",render);
 
 </script>
 
