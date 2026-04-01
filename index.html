@@ -68,7 +68,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ✅ YOUR FIREBASE CONFIG
+// 🔥 YOUR FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -82,25 +82,57 @@ const db = getFirestore(app);
 let data = [];
 let editId = null;
 
-// AUTH STATE
+// 🔥 AUTH STATE
 onAuthStateChanged(auth, async(user)=>{
+console.log("AUTH STATE:", user);
+
 if(user){
 loginBox.style.display="none";
 adminControls.style.display="block";
 await fetchData();
+}else{
+console.log("NOT LOGGED IN");
 }
 });
 
-// LOGIN / SIGNUP
-window.login = ()=>signInWithEmailAndPassword(auth,email.value,password.value);
-window.signup = ()=>createUserWithEmailAndPassword(auth,email.value,password.value);
+// 🔥 LOGIN
+window.login = ()=>{
+signInWithEmailAndPassword(auth,email.value,password.value)
+.then(()=>console.log("LOGIN SUCCESS"))
+.catch(err=>{
+console.error(err);
+alert(err.message);
+});
+};
 
-// FETCH DATA
+// 🔥 SIGNUP
+window.signup = ()=>{
+createUserWithEmailAndPassword(auth,email.value,password.value)
+.then(()=>console.log("SIGNUP SUCCESS"))
+.catch(err=>{
+console.error(err);
+alert(err.message);
+});
+};
+
+// 🔥 FETCH DATA
 async function fetchData(){
+try {
+console.log("Fetching data...");
+
 let snap = await getDocs(collection(db,"parts"));
+
 data = [];
 snap.forEach(d=>data.push({id:d.id,...d.data()}));
+
+console.log("DATA LOADED:", data);
+
 render();
+
+} catch(e){
+console.error("FETCH ERROR:", e);
+alert(e.message);
+}
 }
 
 // CLEAR FORM
@@ -116,8 +148,9 @@ addBtn.style.display="inline-block";
 updateBtn.style.display="none";
 }
 
-// ADD ITEM
+// ADD
 addBtn.onclick = async()=>{
+try{
 let usd = parseFloat(priceUSD.value);
 if(!usd) return alert("Enter price");
 
@@ -133,15 +166,22 @@ priceEUR:(usd*0.92).toFixed(2)
 
 let docRef = await addDoc(collection(db,"parts"),item);
 
-// instant update
 data.push({ id: docRef.id, ...item });
 
 render();
 clearForm();
+
+console.log("ADDED:", item);
+
+}catch(e){
+console.error("ADD ERROR:", e);
+alert(e.message);
+}
 };
 
-// UPDATE ITEM
+// UPDATE
 updateBtn.onclick = async()=>{
+try{
 let usd = parseFloat(priceUSD.value);
 
 let item = {
@@ -156,11 +196,17 @@ priceEUR:(usd*0.92).toFixed(2)
 
 await updateDoc(doc(db,"parts",editId),item);
 
-// update locally
 data = data.map(d => d.id === editId ? { id: editId, ...item } : d);
 
 render();
 clearForm();
+
+console.log("UPDATED:", item);
+
+}catch(e){
+console.error("UPDATE ERROR:", e);
+alert(e.message);
+}
 };
 
 // EDIT
@@ -182,10 +228,18 @@ updateBtn.style.display="inline-block";
 
 // DELETE
 window.deleteItem = async(id)=>{
+try{
 await deleteDoc(doc(db,"parts",id));
 
 data = data.filter(d => d.id !== id);
 render();
+
+console.log("DELETED:", id);
+
+}catch(e){
+console.error("DELETE ERROR:", e);
+alert(e.message);
+}
 };
 
 // RENDER
@@ -248,7 +302,7 @@ else addBtn.onclick();
 });
 });
 
-// FAST SEARCH
+// SEARCH
 let timeout;
 search.addEventListener("input", ()=>{
 clearTimeout(timeout);
