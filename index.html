@@ -7,18 +7,89 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
-body{font-family:Arial;background:#f5f5f5;padding:20px;}
-h2{font-family:'Poppins';background:#212529;color:white;padding:14px;border-radius:6px;text-align:center;font-size:30px;}
 
-input,select{padding:8px;margin:5px;width:170px;}
-button{padding:8px 14px;margin:5px;background:#495057;color:white;border:none;border-radius:5px;cursor:pointer;}
+body{
+font-family:Arial;
+background:#f5f5f5;
+padding:20px;
+}
 
-table{margin-top:10px;border-collapse:collapse;width:100%;background:white;}
-th,td{border:1px solid #ddd;padding:8px;text-align:center;}
-th{background:#495057;color:white;}
-.price{font-weight:bold;color:#2D6A4F;}
+h2{
+font-family:'Poppins';
+background:#212529;
+color:white;
+padding:14px;
+border-radius:6px;
+text-align:center;
+font-size:30px;
+}
+
+.sectionCHRA,.sectionTurbo{
+background:#212529;
+color:white;
+font-size:20px;
+padding:10px;
+}
+
+.makeHeading{
+background:#E85D04;
+color:white;
+padding:8px;
+}
+
+input,select{
+padding:8px;
+margin:5px;
+width:170px;
+}
+
+button{
+padding:8px 14px;
+margin:5px;
+background:#495057;
+color:white;
+border:none;
+border-radius:5px;
+cursor:pointer;
+transition:0.2s;
+}
+
+button:active{
+transform:scale(0.96);
+background:#343a40;
+}
+
+table{
+margin-top:10px;
+border-collapse:collapse;
+width:100%;
+background:white;
+}
+
+th,td{
+border:1px solid #ddd;
+padding:8px;
+text-align:center;
+}
+
+th{
+background:#495057;
+color:white;
+}
+
+.price{
+font-weight:bold;
+color:#2D6A4F;
+}
+
+/* THEMES */
+body.dark{background:#121212;color:white;}
+body.dark table{background:#1f1f1f;color:white;}
+body.orange h2,body.orange .sectionCHRA,body.orange .sectionTurbo{background:#E85D04;}
+body.blue h2,body.blue .sectionCHRA,body.blue .sectionTurbo{background:#1971C2;}
+body.green h2,body.green .sectionCHRA,body.green .sectionTurbo{background:#2D6A4F;}
+
 </style>
-
 </head>
 
 <body>
@@ -28,18 +99,27 @@ th{background:#495057;color:white;}
 <div id="loginBox">
 <input id="email" placeholder="Email"><br>
 <input id="password" type="password" placeholder="Password"><br>
-<button id="loginBtn">Login</button>
-<button id="signupBtn">Signup</button>
+<button onclick="clickEffect(this);login()">Login</button>
+<button onclick="clickEffect(this);signup()">Signup</button>
 </div>
 
 <div id="adminControls" style="display:none;">
 
-<input id="search" placeholder="Search anything...">
+<input id="search" placeholder="Search Part Number">
+<button onclick="clickEffect(this);render()">Search</button>
 
 <select id="filterType">
 <option value="all">All Types</option>
 <option value="CHRA">CHRA</option>
 <option value="Turbocharger">Turbocharger</option>
+</select>
+
+<select onchange="changeTheme(this.value)">
+<option value="default">Theme</option>
+<option value="dark">Dark</option>
+<option value="orange">Orange</option>
+<option value="blue">Blue</option>
+<option value="green">Green</option>
 </select>
 
 <br><br>
@@ -58,18 +138,16 @@ th{background:#495057;color:white;}
 
 <br>
 
-<button id="addBtn">Add</button>
-<button id="updateBtn" style="display:none;">Update</button>
+<button id="addBtn" onclick="addItem()">Add / Update</button>
+<button onclick="clickEffect(this);downloadCSV()">Download Excel</button>
 
-<br><br>
-
-<button id="downloadBtn">Download Excel</button>
+<!-- FILE UPLOAD WITH BUTTON -->
 <input type="file" id="fileInput">
-<button id="uploadBtn">Upload</button>
+<button onclick="uploadFile(this)">Upload</button>
 
 <br>
 
-<button id="customerBtn">Customer Catalog Link</button>
+<button onclick="clickEffect(this);openCustomer()">Customer Catalog Link</button>
 
 </div>
 
@@ -79,13 +157,8 @@ th{background:#495057;color:white;}
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 CHECK CUSTOMER MODE
-const urlParams = new URLSearchParams(window.location.search);
-const isCustomer = urlParams.get("view") === "customer";
-
-// FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -96,224 +169,220 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// DOM
-const loginBox = document.getElementById("loginBox");
-const adminControls = document.getElementById("adminControls");
+let data=[];
+let editId=null;
 
-const email = document.getElementById("email");
-const password = document.getElementById("password");
+const urlParams = new URLSearchParams(window.location.search);
+const isCustomer = urlParams.get("view") === "customer";
 
-const search = document.getElementById("search");
-const filterType = document.getElementById("filterType");
-
-const part = document.getElementById("part");
-const desc = document.getElementById("desc");
-const make = document.getElementById("make");
-const engine = document.getElementById("engine");
-const type = document.getElementById("type");
-const priceUSD = document.getElementById("priceUSD");
-
-const addBtn = document.getElementById("addBtn");
-const updateBtn = document.getElementById("updateBtn");
-const table = document.getElementById("table");
-
-let data = [];
-let editId = null;
-
-// 🔥 CUSTOMER MODE (NO LOGIN)
 if(isCustomer){
-loginBox.style.display="none";
-adminControls.style.display="none";
-fetchData();
+document.getElementById("adminControls").style.display="none";
 }
 
-// LOGIN
-document.getElementById("loginBtn").onclick = ()=>{
-signInWithEmailAndPassword(auth,email.value,password.value)
-.catch(err=>alert(err.message));
-};
-
-// SIGNUP
-document.getElementById("signupBtn").onclick = ()=>{
-createUserWithEmailAndPassword(auth,email.value,password.value)
-.catch(err=>alert(err.message));
-};
-
-// AUTH
-onAuthStateChanged(auth, async(user)=>{
-if(user && !isCustomer){
+onAuthStateChanged(auth,async(user)=>{
+if(user){
 loginBox.style.display="none";
 adminControls.style.display="block";
 await fetchData();
 }
 });
 
-// FETCH
+window.login=()=>signInWithEmailAndPassword(auth,email.value,password.value);
+window.signup=()=>createUserWithEmailAndPassword(auth,email.value,password.value);
+
 async function fetchData(){
-let q = query(collection(db,"parts"), limit(200));
-let snap = await getDocs(q);
-
-data = [];
+let snap=await getDocs(collection(db,"parts"));
+data=[];
 snap.forEach(d=>data.push({id:d.id,...d.data()}));
-
 render();
 }
 
-// ADD
-addBtn.onclick = async()=>{
-let usd = parseFloat(priceUSD.value);
-if(!usd) return alert("Enter price");
+window.addItem=async()=>{
 
-let item = {
+let btn=document.getElementById("addBtn");
+
+btn.style.background="#2D6A4F";
+btn.innerText="Adding...";
+
+let usd=parseFloat(priceUSD.value);
+let eur=(usd*0.92).toFixed(2);
+
+let item={
 part:part.value,
 desc:desc.value,
 make:make.value.toUpperCase(),
 engine:engine.value.toUpperCase(),
 type:type.value,
 priceUSD:usd,
-priceEUR:(usd*0.92).toFixed(2)
+priceEUR:eur
 };
 
-let ref = await addDoc(collection(db,"parts"),item);
-data.unshift({id:ref.id,...item});
-
-render();
-clearForm();
-};
-
-// UPDATE
-updateBtn.onclick = async()=>{
-let usd = parseFloat(priceUSD.value);
-
-let item = {
-part:part.value,
-desc:desc.value,
-make:make.value.toUpperCase(),
-engine:engine.value.toUpperCase(),
-type:type.value,
-priceUSD:usd,
-priceEUR:(usd*0.92).toFixed(2)
-};
-
+if(editId){
 await updateDoc(doc(db,"parts",editId),item);
+editId=null;
+}else{
+await addDoc(collection(db,"parts"),item);
+}
 
-data = data.map(d=>d.id===editId ? {id:editId,...item} : d);
+btn.style.background="#198754";
+btn.innerText="Added";
 
-render();
-clearForm();
+part.value="";
+desc.value="";
+make.value="";
+engine.value="";
+priceUSD.value="";
+
+await fetchData();
+
+setTimeout(()=>{
+btn.style.background="#495057";
+btn.innerText="Add / Update";
+},1000);
+
 };
 
-// DELETE
-window.deleteItem = async(id)=>{
+// FILE UPLOAD FUNCTION
+window.uploadFile=async(btn)=>{
+
+clickEffect(btn);
+
+const file=document.getElementById("fileInput").files[0];
+if(!file) return alert("Select file");
+
+const reader=new FileReader();
+
+reader.onload=async function(event){
+
+const lines=event.target.result.split("\n");
+
+for(let row of lines.slice(1)){
+let cols=row.split(",");
+if(cols.length>=6){
+
+let usd=parseFloat(cols[5]);
+
+await addDoc(collection(db,"parts"),{
+part:cols[0],
+desc:cols[1],
+make:cols[2],
+engine:cols[3],
+type:cols[4],
+priceUSD:usd,
+priceEUR:(usd*0.92).toFixed(2)
+});
+
+}
+}
+
+fetchData();
+
+};
+
+reader.readAsText(file);
+};
+
+window.deleteItem=async(id)=>{
+clickEffect(event.target);
 await deleteDoc(doc(db,"parts",id));
-data = data.filter(d=>d.id!==id);
-render();
+fetchData();
 };
 
-// EDIT
-window.editItem = (id)=>{
-let d = data.find(x=>x.id===id);
-
+window.editItem=(id)=>{
+clickEffect(event.target);
+let d=data.find(x=>x.id===id);
 part.value=d.part;
 desc.value=d.desc;
 make.value=d.make;
 engine.value=d.engine;
 type.value=d.type;
 priceUSD.value=d.priceUSD;
-
 editId=id;
-addBtn.style.display="none";
-updateBtn.style.display="inline-block";
 };
 
-// CLEAR
-function clearForm(){
-part.value="";
-desc.value="";
-make.value="";
-engine.value="";
-priceUSD.value="";
-editId=null;
-addBtn.style.display="inline-block";
-updateBtn.style.display="none";
-}
+window.downloadCSV=()=>{
+let csv="Part No,Description,Car Make,Engine Model,Type,Price USD,Price EUR\n";
 
-// DOWNLOAD
-document.getElementById("downloadBtn").onclick=()=>{
-let csv="Part,Desc,Make,Engine,Type,USD,EUR\n";
 data.forEach(d=>{
 csv+=`${d.part},${d.desc},${d.make},${d.engine},${d.type},${d.priceUSD},${d.priceEUR}\n`;
 });
-const blob=new Blob([csv]);
+
+const blob=new Blob([csv],{type:"text/csv"});
 const a=document.createElement("a");
 a.href=URL.createObjectURL(blob);
 a.download="ziedel_price_list.csv";
 a.click();
 };
 
-// UPLOAD
-document.getElementById("uploadBtn").onclick=()=>{
-const file=document.getElementById("fileInput").files[0];
-if(!file) return alert("Select file");
-
-const reader=new FileReader();
-reader.onload=async(e)=>{
-let rows=e.target.result.split("\n");
-
-for(let r of rows.slice(1)){
-let c=r.split(",");
-if(c.length>=6){
-let usd=parseFloat(c[5]);
-await addDoc(collection(db,"parts"),{
-part:c[0],
-desc:c[1],
-make:c[2],
-engine:c[3],
-type:c[4],
-priceUSD:usd,
-priceEUR:(usd*0.92).toFixed(2)
-});
-}
-}
-fetchData();
-};
-reader.readAsText(file);
-};
-
-// CUSTOMER LINK BUTTON
-document.getElementById("customerBtn").onclick=()=>{
-let link=window.location.origin+window.location.pathname+"?view=customer";
+window.openCustomer=()=>{
+const link=window.location.origin+window.location.pathname+"?view=customer";
 window.open(link,"_blank");
 };
 
-// RENDER
+window.changeTheme=(t)=>{
+document.body.className=t==="default"?"":t;
+};
+
+function clickEffect(btn){
+btn.style.background="#198754";
+setTimeout(()=>{
+btn.style.background="#495057";
+},300);
+}
+
 function render(){
 
-let searchVal=search.value.toLowerCase();
-let filterVal=filterType.value;
+let table=document.getElementById("table");
+table.innerHTML="";
+
+let searchVal=document.getElementById("search").value.toLowerCase();
+let filterVal=document.getElementById("filterType").value;
 
 let filtered=data.filter(d=>{
-return (
-d.part.toLowerCase().includes(searchVal) ||
-d.desc.toLowerCase().includes(searchVal) ||
-d.make.toLowerCase().includes(searchVal) ||
-d.engine.toLowerCase().includes(searchVal)
-) && (filterVal==="all" || d.type===filterVal);
+let matchSearch=d.part.toLowerCase().includes(searchVal);
+let matchType=filterVal==="all"?true:d.type===filterVal;
+return matchSearch && matchType;
 });
 
-table.innerHTML=`
+let chra=filtered.filter(d=>d.type==="CHRA");
+let turbo=filtered.filter(d=>d.type==="Turbocharger");
+
+renderSection("CHRA LIST",chra,"sectionCHRA");
+renderSection("TURBOCHARGER LIST",turbo,"sectionTurbo");
+
+}
+
+function renderSection(title,list,style){
+
+if(list.length===0) return;
+
+let table=document.getElementById("table");
+
+table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="${style}">${title}</td></tr>`;
+
+let grouped={};
+
+list.forEach(d=>{
+if(!grouped[d.make]) grouped[d.make]=[];
+grouped[d.make].push(d);
+});
+
+for(let make in grouped){
+
+table.innerHTML+=`<tr><td colspan="${isCustomer?6:7}" class="makeHeading">${make}</td></tr>`;
+
+table.innerHTML+=`
 <tr>
-<th>Part</th>
+<th>Part No</th>
 <th>Description</th>
-<th>Make</th>
-<th>Engine</th>
+<th>Car Make</th>
+<th>Engine Model</th>
 <th>Type</th>
 <th>Price</th>
-${isCustomer ? "" : "<th>Action</th>"}
-</tr>
-`;
+${isCustomer?"":"<th>Action</th>"}
+</tr>`;
 
-filtered.forEach(d=>{
+grouped[make].forEach(d=>{
 table.innerHTML+=`
 <tr>
 <td>${d.part}</td>
@@ -322,24 +391,16 @@ table.innerHTML+=`
 <td>${d.engine}</td>
 <td>${d.type}</td>
 <td class="price">$${d.priceUSD} / €${d.priceEUR}</td>
-${isCustomer ? "" : `
-<td>
+${isCustomer?"":`<td>
 <button onclick="editItem('${d.id}')">Edit</button>
 <button onclick="deleteItem('${d.id}')">Delete</button>
 </td>`}
-</tr>
-`;
+</tr>`;
 });
+
 }
 
-// SEARCH
-let timeout;
-search.addEventListener("input", ()=>{
-clearTimeout(timeout);
-timeout = setTimeout(render, 200);
-});
-
-filterType.addEventListener("change",render);
+}
 
 </script>
 
