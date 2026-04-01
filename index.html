@@ -79,9 +79,9 @@ th{background:#495057;color:white;}
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// FIREBASE
+// FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAIuTPfhuiUpkyT48ASOZ6k22rYc2xqs48",
   authDomain: "ziedel-price-list.firebaseapp.com",
@@ -111,34 +111,42 @@ const priceUSD = document.getElementById("priceUSD");
 
 const addBtn = document.getElementById("addBtn");
 const updateBtn = document.getElementById("updateBtn");
-
 const table = document.getElementById("table");
 
 let data = [];
 let editId = null;
 
-// AUTH
+// LOGIN
 document.getElementById("loginBtn").onclick = ()=>{
-signInWithEmailAndPassword(auth,email.value,password.value);
+signInWithEmailAndPassword(auth,email.value,password.value)
+.catch(err=>alert(err.message));
 };
 
+// SIGNUP
 document.getElementById("signupBtn").onclick = ()=>{
-createUserWithEmailAndPassword(auth,email.value,password.value);
+createUserWithEmailAndPassword(auth,email.value,password.value)
+.catch(err=>alert(err.message));
 };
 
+// AUTH STATE
 onAuthStateChanged(auth, async(user)=>{
 if(user){
 loginBox.style.display="none";
 adminControls.style.display="block";
 await fetchData();
+}else{
+adminControls.style.display="none";
 }
 });
 
-// FETCH
+// FETCH (LIMITED = FAST)
 async function fetchData(){
-let snap = await getDocs(collection(db,"parts"));
+let q = query(collection(db,"parts"), limit(200)); // 🔥 SPEED FIX
+let snap = await getDocs(q);
+
 data = [];
 snap.forEach(d=>data.push({id:d.id,...d.data()}));
+
 render();
 }
 
@@ -158,7 +166,7 @@ priceEUR:(usd*0.92).toFixed(2)
 };
 
 let ref = await addDoc(collection(db,"parts"),item);
-data.push({id:ref.id,...item});
+data.unshift({id:ref.id,...item});
 
 render();
 clearForm();
@@ -221,7 +229,7 @@ addBtn.style.display="inline-block";
 updateBtn.style.display="none";
 }
 
-// CSV DOWNLOAD
+// DOWNLOAD CSV
 document.getElementById("downloadBtn").onclick=()=>{
 let csv="Part,Desc,Make,Engine,Type,USD,EUR\n";
 data.forEach(d=>{
@@ -234,7 +242,7 @@ a.download="ziedel_price_list.csv";
 a.click();
 };
 
-// CSV UPLOAD
+// UPLOAD CSV
 document.getElementById("uploadBtn").onclick=()=>{
 const file=document.getElementById("fileInput").files[0];
 if(!file) return alert("Select file");
@@ -271,6 +279,11 @@ window.open(link,"_blank");
 
 // RENDER
 function render(){
+
+if(!data.length){
+table.innerHTML="<tr><td>Loading...</td></tr>";
+return;
+}
 
 let searchVal=search.value.toLowerCase();
 let filterVal=filterType.value;
@@ -314,8 +327,13 @@ table.innerHTML+=`
 });
 }
 
-// SEARCH
-search.addEventListener("input",render);
+// SMOOTH SEARCH
+let timeout;
+search.addEventListener("input", ()=>{
+clearTimeout(timeout);
+timeout = setTimeout(render, 200);
+});
+
 filterType.addEventListener("change",render);
 
 </script>
